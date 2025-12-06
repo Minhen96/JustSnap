@@ -1,7 +1,7 @@
 // JustSnap - Translation Service (OpenAI)
 // Reference: tech_stack.md lines 96, use_case.md line 80
 
-const OPENAI_API_KEY = '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';
+const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY || '';
 
 export type TranslationLanguage = 'en' | 'zh' | 'ms'; // English, Chinese, Malay
 

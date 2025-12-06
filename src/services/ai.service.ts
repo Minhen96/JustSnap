@@ -16,8 +16,8 @@ import {
   buildAskFrameworkCodePrompt,
 } from '../utils/prompts/askReactPrompt';
 
-// OpenAI API Key provided by user (hardcoded for now as requested)
-const OPENAI_API_KEY = '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';
+// OpenAI API Key from environment variable
+const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY || '';
 const OPENAI_MODEL = 'gpt-4o'; // Multi-modal model
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 

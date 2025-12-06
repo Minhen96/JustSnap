@@ -64,7 +64,18 @@
    - Frontend dependencies (React, TypeScript, Vite, TailwindCSS, etc.)
    - Tauri CLI (automatically included in `devDependencies`)
 
-3. Run in development mode:
+3. Set up environment variables:
+   ```bash
+   # Copy the example environment file
+   cp .env.example .env
+   ```
+
+   Then edit `.env` and add your OpenAI API key:
+   ```
+   VITE_OPENAI_API_KEY=your_openai_api_key_here
+   ```
+
+4. Run in development mode:
    ```bash
    npm run tauri dev
    ```
