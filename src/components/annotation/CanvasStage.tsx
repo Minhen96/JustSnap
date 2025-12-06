@@ -15,6 +15,7 @@ interface CanvasStageProps {
   currentStyle: AnnotationStyle;
   onAddAnnotation: (annotation: Annotation) => void;
   onUpdateAnnotation: (id: string, updates: Partial<Annotation>) => void;
+  onTextEditingChange?: (isEditing: boolean) => void;
 }
 
 export function CanvasStage({
@@ -25,20 +26,25 @@ export function CanvasStage({
   currentTool,
   currentStyle,
   onAddAnnotation,
-  onUpdateAnnotation
+  onUpdateAnnotation,
+  onTextEditingChange
 }: CanvasStageProps) {
   const [image, setImage] = useState<HTMLImageElement | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentAnnotation, setCurrentAnnotation] = useState<Annotation | null>(null);
+  const [editingTextId, setEditingTextId] = useState<string | null>(null);
+  const [textInput, setTextInput] = useState('');
+  const [textPosition, setTextPosition] = useState<{ x: number; y: number } | null>(null);
   const stageRef = useRef<Konva.Stage>(null);
+  const textInputRef = useRef<HTMLInputElement>(null);
 
   // Expose stage ref to parent via callback
   useEffect(() => {
-    if (stageRef.current && onUpdateAnnotation) {
+    if (stageRef.current) {
       // Store stage ref for export purposes
       (window as any).__konvaStage = stageRef.current;
     }
-  }, [onUpdateAnnotation]);
+  }, []);
 
   // Load the screenshot image
   useEffect(() => {
@@ -49,15 +55,121 @@ export function CanvasStage({
     };
   }, [imageUrl]);
 
+  // Focus text input when editing
+  useEffect(() => {
+    if (editingTextId && textInputRef.current) {
+      textInputRef.current.focus();
+    }
+  }, [editingTextId]);
+
+  // Debug logging for text input state
+  useEffect(() => {
+    console.log('[Text Input State]', {
+      editingTextId,
+      textPosition,
+      textInput,
+      shouldShow: !!(editingTextId && textPosition)
+    });
+  }, [editingTextId, textPosition, textInput]);
+
+  // Global keyboard listener for text tool
+  useEffect(() => {
+    if (!editingTextId || currentTool !== 'text') return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      console.log('[Global Keyboard] Key:', e.key);
+      
+      // Prevent this event from reaching parent shortcuts
+      e.stopPropagation();
+      
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleTextSubmit();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        handleTextCancel();
+      } else if (e.key === 'Backspace') {
+        e.preventDefault();
+        setTextInput(prev => prev.slice(0, -1));
+      } else if (e.key.length === 1) {
+        // Single character key (letter, number, symbol)
+        e.preventDefault();
+        setTextInput(prev => prev + e.key);
+      }
+    };
+
+    // Use capture phase to intercept before parent handlers
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [editingTextId, currentTool, textInput]);
+
+  // Auto-commit text when switching tools
+  useEffect(() => {
+    // If tool changed away from text and there's text being edited
+    if (currentTool !== 'text' && editingTextId) {
+      if (textPosition && textInput.trim()) {
+        // Commit the text if there's actual content
+        console.log('[Text Tool] Auto-committing text due to tool change');
+        const newAnnotation: Annotation = {
+          id: crypto.randomUUID(),
+          tool: 'text',
+          style: { ...currentStyle },
+          x: textPosition.x,
+          y: textPosition.y,
+          text: textInput,
+        };
+        onAddAnnotation(newAnnotation);
+      } else {
+        // Just clear the state if no text was typed
+        console.log('[Text Tool] Clearing empty text due to tool change');
+      }
+      setEditingTextId(null);
+      setTextInput('');
+      setTextPosition(null);
+    }
+  }, [currentTool]);
+
+  // Notify parent when text editing state changes
+  useEffect(() => {
+    if (onTextEditingChange) {
+      onTextEditingChange(!!editingTextId);
+    }
+  }, [editingTextId, onTextEditingChange]);
+
   // Handle mouse down - start drawing
   const handleMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
-    if (currentTool === 'none' || currentTool === 'select') return;
+    if (currentTool === 'none') return;
 
     const stage = e.target.getStage();
     if (!stage) return;
 
     const pos = stage.getPointerPosition();
     if (!pos) return;
+
+    // Special handling for text tool - click to place
+    if (currentTool === 'text') {
+      console.log('[Text Tool] Clicked at:', pos);
+      
+      // If there's existing text being edited, commit it first
+      if (editingTextId && textPosition && textInput.trim()) {
+        const newAnnotation: Annotation = {
+          id: crypto.randomUUID(),
+          tool: 'text',
+          style: { ...currentStyle },
+          x: textPosition.x,
+          y: textPosition.y,
+          text: textInput,
+        };
+        onAddAnnotation(newAnnotation);
+      }
+      
+      // Start new text at clicked position
+      setTextPosition({ x: pos.x, y: pos.y });
+      setTextInput('');
+      setEditingTextId('new');
+      console.log('[Text Tool] State set, should show input');
+      return;
+    }
 
     setIsDrawing(true);
 
@@ -123,6 +235,40 @@ export function CanvasStage({
     setIsDrawing(false);
     onAddAnnotation(currentAnnotation);
     setCurrentAnnotation(null);
+  };
+
+  // Handle text input submission
+  const handleTextSubmit = () => {
+    if (!textPosition || !textInput.trim()) {
+      // Only clear if there's no text - allow empty cancel
+      if (!textInput.trim()) {
+        setEditingTextId(null);
+        setTextInput('');
+        setTextPosition(null);
+      }
+      return;
+    }
+
+    const newAnnotation: Annotation = {
+      id: crypto.randomUUID(),
+      tool: 'text',
+      style: { ...currentStyle },
+      x: textPosition.x,
+      y: textPosition.y,
+      text: textInput,
+    };
+
+    onAddAnnotation(newAnnotation);
+    setEditingTextId(null);
+    setTextInput('');
+    setTextPosition(null);
+  };
+
+  // Handle text input cancel
+  const handleTextCancel = () => {
+    setEditingTextId(null);
+    setTextInput('');
+    setTextPosition(null);
   };
 
   // Render individual annotation
@@ -200,17 +346,28 @@ export function CanvasStage({
         );
 
       case 'blur':
-        return (
-          <Rect
-            key={id}
-            x={x}
-            y={y}
-            width={width}
-            height={height}
-            fill="rgba(0, 0, 0, 0.5)"
-            opacity={opacity}
-          />
-        );
+        // Create a pixelated/mosaic blur effect
+        const pixelSize = 10; // Size of each pixel block
+        const rects = [];
+        
+        for (let i = 0; i < Math.abs(width); i += pixelSize) {
+          for (let j = 0; j < Math.abs(height); j += pixelSize) {
+            rects.push(
+              <Rect
+                key={`${id}-${i}-${j}`}
+                x={x + i}
+                y={y + j}
+                width={pixelSize}
+                height={pixelSize}
+                fill="#000000"
+                opacity={0.7}
+                stroke="#000000"
+                strokeWidth={0.5}
+              />
+            );
+          }
+        }
+        return <>{rects}</>;
 
       case 'text':
         return (
@@ -219,7 +376,8 @@ export function CanvasStage({
             x={x}
             y={y}
             text={text}
-            fontSize={20}
+            fontSize={24}
+            fontFamily="Arial"
             fill={color}
             opacity={opacity}
           />
@@ -231,30 +389,52 @@ export function CanvasStage({
   };
 
   return (
-    <Stage
-      ref={stageRef}
-      width={width}
-      height={height}
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-    >
-      <Layer>
-        {/* Background screenshot image */}
-        {image && (
-          <KonvaImage
-            image={image}
-            width={width}
-            height={height}
-          />
-        )}
+    <div style={{ position: 'relative' }}>
+      <Stage
+        ref={stageRef}
+        width={width}
+        height={height}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+      >
+        <Layer>
+          {/* Background screenshot image */}
+          {image && (
+            <KonvaImage
+              image={image}
+              width={width}
+              height={height}
+            />
+          )}
 
-        {/* Render all saved annotations */}
-        {annotations.map(renderAnnotation)}
+          {/* Render all saved annotations */}
+          {annotations.map(renderAnnotation)}
 
-        {/* Render current annotation being drawn */}
-        {currentAnnotation && renderAnnotation(currentAnnotation)}
-      </Layer>
-    </Stage>
+          {/* Render current annotation being drawn */}
+          {currentAnnotation && renderAnnotation(currentAnnotation)}
+        </Layer>
+      </Stage>
+
+      {/* Text Input Overlay - Live preview while typing */}
+      {editingTextId && textPosition && (
+        <div
+          style={{
+            position: 'absolute',
+            left: textPosition.x,
+            top: textPosition.y,
+            fontSize: '24px',
+            fontFamily: 'Arial',
+            color: currentStyle.color,
+            whiteSpace: 'nowrap',
+            pointerEvents: 'none',
+            userSelect: 'none',
+            zIndex: 9999,
+          }}
+        >
+          {textInput || '|'} {/* Show cursor when empty */}
+        </div>
+      )}
+    </div>
   );
 }
