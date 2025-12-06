@@ -41,7 +41,43 @@ function App() {
       try {
         const { listen } = await import('@tauri-apps/api/event');
         
-        await listen('hotkey-triggered', () => {
+        await listen('hotkey-triggered', async () => {
+           console.log('[App] Hotkey triggered! Resetting window and state...');
+           
+           // Clear previous image to force loading state
+           setImgSrc(null);
+           
+           // Reset window to full screen overlay mode
+           const { getCurrentWindow, LogicalPosition, currentMonitor, LogicalSize } = await import('@tauri-apps/api/window');
+           const win = getCurrentWindow();
+           
+           try {
+             // Forcefully reset state
+             await win.setFullscreen(false);
+             await win.setResizable(true); 
+             
+             const monitor = await currentMonitor();
+             if (monitor) {
+               const width = monitor.size.width / monitor.scaleFactor;
+               const height = monitor.size.height / monitor.scaleFactor;
+               console.log(`[App] Setting window size to ${width}x${height}`);
+               await win.setSize(new LogicalSize(width, height));
+               await win.setPosition(new LogicalPosition(0, 0));
+             }
+             
+             await win.setResizable(false);
+             await win.setAlwaysOnTop(true);
+             await win.setDecorations(false);
+             await win.setSkipTaskbar(true);
+             
+             // Ensure visible
+             await win.show();
+             await win.setFocus();
+             
+           } catch (err) {
+             console.error('[App] Window reset failed:', err);
+           }
+           
            useAppStore.getState().showOverlay('capture');
         });
 

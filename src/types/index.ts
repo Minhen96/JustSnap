@@ -86,8 +86,9 @@ export interface TranslationRequest {
 
 export interface TranslationResult {
   translatedText: string;
-  sourceLang: string;
-  targetLang: string;
+  detectedSourceLanguage: string;
+  targetLanguage: 'en' | 'zh' | 'ms'; // English, Chinese, Malay
+  sourceText: string;
 }
 
 export interface AISummary {

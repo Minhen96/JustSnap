@@ -36,45 +36,6 @@ export function ScreenshotEditor() {
     updateStyle,
   } = useAnnotation();
 
-  // Restore window logic helper
-  const restoreWindow = useCallback(async () => {
-    const win = getCurrentWindow();
-    const monitor = await currentMonitor();
-    if (monitor) {
-       // We use physical size because currentMonitor returns physical
-       // But setSize uses Logical by default unless specified? 
-       // Actually monitor.size is PhysicalSize.
-       // It's safer to use setFullscreen(true) for overlay apps or explicitly set size.
-       // For this app, let's try setting it to the monitor size.
-       // NOTE: This assumes the app is meant to be a full-screen overlay.
-       // If it fails, we might need a specific 'reset_window' command in Rust.
-       await win.setSize(new LogicalSize(monitor.size.width / monitor.scaleFactor, monitor.size.height / monitor.scaleFactor));
-       await win.setPosition(new LogicalPosition(0, 0));
-       await win.setAlwaysOnTop(true); // Reset to default overlay behavior (usually on top when active)
-    }
-  }, []);
-
-  const shrinkWindowForPanelOnly = useCallback(async () => {
-    const win = getCurrentWindow();
-    const monitor = await currentMonitor();
-    const width = 520;
-    const height = 620;
-    const margin = 24;
-    if (monitor) {
-      const logicalWidth = monitor.size.width / monitor.scaleFactor;
-      const logicalHeight = monitor.size.height / monitor.scaleFactor;
-      const posX = Math.max(margin, logicalWidth - width - margin);
-      const posY = Math.max(margin, 60);
-      await win.setSize(new LogicalSize(width, height));
-      await win.setPosition(new LogicalPosition(posX, posY));
-      await win.setAlwaysOnTop(false); // allow interacting with other apps
-    } else {
-      await win.setSize(new LogicalSize(width, height));
-      await win.setPosition(new LogicalPosition(margin, margin));
-      await win.setAlwaysOnTop(false);
-    }
-  }, []);
-
   // Calculate canvas dimensions based on screenshot
   useEffect(() => {
     if (!currentScreenshot) return;
@@ -86,13 +47,6 @@ export function ScreenshotEditor() {
     });
   }, [currentScreenshot]);
 
-  // If editor was hidden for panel-only mode and we get a new screenshot, restore full window
-  useEffect(() => {
-    if (!editorHidden && currentScreenshot) {
-      restoreWindow();
-    }
-  }, [editorHidden, currentScreenshot, restoreWindow]);
-
   const closeOverlayAndReset = useCallback(async () => {
     const win = getCurrentWindow();
     await win.hide();
@@ -103,21 +57,13 @@ export function ScreenshotEditor() {
         setFeedback(null);
         setEditorHidden(false);
         setAskPanelImage(null);
+        setShowAskReact(false);
     }, 100);
   }, [clearScreenshot]);
 
   const handleClose = useCallback(async () => {
-    // If AI panel is open, keep overlay visible for the panel and hide editor UI instead
-    if (showAskReact && (askPanelImage || currentScreenshot?.imageData)) {
-      if (!askPanelImage && currentScreenshot?.imageData) {
-        setAskPanelImage(currentScreenshot.imageData);
-      }
-      setEditorHidden(true);
-      await shrinkWindowForPanelOnly();
-      return;
-    }
     await closeOverlayAndReset();
-  }, [askPanelImage, closeOverlayAndReset, currentScreenshot, showAskReact, shrinkWindowForPanelOnly]);
+  }, [closeOverlayAndReset]);
 
   // Handle keyboard shortcuts
   useEffect(() => {
@@ -290,15 +236,46 @@ export function ScreenshotEditor() {
   }, [currentScreenshot, dimensions, exportCanvasAsDataURL, handleClose]);
 
   const handleGenerateAiCode = useCallback(
-    (framework: AskFramework) => {
-      setInitialAskFramework(framework);
-      setEditorHidden(false);
-      if (currentScreenshot?.imageData) {
-        setAskPanelImage(currentScreenshot.imageData);
+    async (framework: AskFramework) => {
+      // Approach 2: Create a new standalone window for AI Panel
+      // This mimics the "Stick" functionality which works well vertically/horizontally
+      
+      // Get current screen metrics to position the new window
+      const win = getCurrentWindow();
+      const monitor = await currentMonitor();
+      if (!monitor) return;
+
+      const scaleFactor = monitor.scaleFactor;
+      const logicalWidth = monitor.size.width / scaleFactor;
+      // Center horizontally, near top properly
+      const width = 520;
+      const height = 620;
+      const margin = 24;
+      
+      // Position at Top-Right like the old stick behavior, or Centered?
+      // User said "refer stick function", which usually puts it where the user selected or a default place.
+      // Let's stick to Top-Right area for consistency with previous AI panel attempts.
+      const x = Math.max(margin, logicalWidth - width - margin);
+      const y = 60; // Top margin
+
+      const { invoke } = await import('@tauri-apps/api/core');
+      const dataURL = exportCanvasAsDataURL(); // Synchrnous usually? No, returns string? it's defined in component
+
+      if (dataURL) {
+        await invoke('create_ai_panel_window', {
+          imageSrc: dataURL,
+          framework,
+          x,
+          y,
+          width,
+          height
+        });
+
+        // Close the main editor overlay as we moved to a new window
+        handleClose();
       }
-      setShowAskReact(true);
     },
-    [currentScreenshot]
+    [exportCanvasAsDataURL, handleClose]
   );
 
 
@@ -440,9 +417,9 @@ export function ScreenshotEditor() {
           onClose={() => {
             setShowAskReact(false);
             setAskPanelImage(null);
-            if (!currentScreenshot || editorHidden) {
-              void closeOverlayAndReset();
-            }
+            
+            // Close window completely (like stick function)
+            void closeOverlayAndReset();
           }}
         />
       )}

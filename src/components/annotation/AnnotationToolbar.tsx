@@ -26,6 +26,7 @@ import {
 import { ColorPickerPopover } from './ColorPickerPopover';
 import { useAppStore } from '../../store/appStore';
 import { OCRPanel } from '../ai/OCRPanel';
+import { TranslationPanel } from '../ai/TranslationPanel';
 
 interface AnnotationToolbarProps {
   currentTool: AnnotationTool;
@@ -90,6 +91,7 @@ export function AnnotationToolbar({
 
   const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
   const [showOCRPanel, setShowOCRPanel] = useState(false);
+  const [showTranslationPanel, setShowTranslationPanel] = useState(false);
   const colorButtonRef = useRef<HTMLButtonElement>(null);
 
   // OCR State from store
@@ -136,6 +138,7 @@ export function AnnotationToolbar({
     <>
       {/* OCR Results Panel */}
       {showOCRPanel && <OCRPanel onClose={() => setShowOCRPanel(false)} />}
+      {showTranslationPanel && <TranslationPanel onClose={() => setShowTranslationPanel(false)} />}
 
       {/* Toolbar */}
       <div
@@ -276,10 +279,16 @@ export function AnnotationToolbar({
 
               <ScanText size={20} className="relative z-10" />
             </button>
+            {/* Translation Button - Only enabled when OCR text exists */}
             <button
-              className="p-2 rounded-lg bg-white hover:bg-gray-100 text-gray-700 border border-gray-300 opacity-50 cursor-not-allowed"
-              title="Translate (Coming Soon)"
-              disabled
+              onClick={() => setShowTranslationPanel(true)}
+              disabled={!ocrResult || !ocrResult.text.trim()}
+              className={`relative p-2 rounded-lg transition-all border ${
+                !ocrResult || !ocrResult.text.trim()
+                  ? 'bg-white text-gray-400 border-gray-300 opacity-50 cursor-not-allowed'
+                  : 'bg-white hover:bg-purple-50 text-purple-600 border-purple-300'
+              }`}
+              title={!ocrResult || !ocrResult.text.trim() ? 'Translation (OCR text required)' : 'Translate'}
             >
               <Languages size={20} />
             </button>

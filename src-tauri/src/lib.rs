@@ -113,6 +113,7 @@ pub fn run() {
             commands::restore_window,
             commands::save_temp_image,
             commands::create_sticky_window,
+            commands::create_ai_panel_window,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -19,7 +19,7 @@ import {
 // TODO: Add OpenAI API key configuration
 const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY || '';
 // Google Generative AI (Gemini) - hardcoded per request
-const GOOGLE_GENAI_KEY = 'AIzaSyCnH_WCNFor3FNk4ozsdmOplH-iqX0Mveo';
+const GOOGLE_GENAI_KEY = 'AIzaSyA7kInNLavaZevhBA93yGAA2QfHXTFcDTI';
 const GEMINI_MODEL = 'gemini-2.0-flash';
 // OpenAI-compatible endpoint for Gemini (v1beta)
 const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/openai';
@@ -131,12 +131,14 @@ export async function translateText(
   text: string,
   targetLang: 'en' | 'zh' | 'ms'
 ): Promise<TranslationResult> {
-  // TODO: Implement OpenAI translation API call
+  // Note: This is now handled by translation.service.ts with Gemini
+  // This placeholder exists for backward compatibility
   console.log('Translating text to:', targetLang);
   return {
     translatedText: 'Translated text placeholder',
-    sourceLang: 'auto',
-    targetLang,
+    detectedSourceLanguage: 'auto',
+    targetLanguage: targetLang,
+    sourceText: text,
   };
 }
 

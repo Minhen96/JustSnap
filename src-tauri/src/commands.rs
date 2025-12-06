@@ -364,3 +364,45 @@ pub async fn create_sticky_window(
 
     Ok(())
 }
+
+#[command]
+pub async fn create_ai_panel_window(
+    app: tauri::AppHandle,
+    image_src: String,
+    framework: String,
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+) -> Result<(), String> {
+    use tauri::{WebviewUrl, WebviewWindowBuilder};
+
+    let label = format!("ai_panel_{}", chrono::Utc::now().timestamp_micros());
+
+    // Inject data directly
+    // JSON stringify the framework to be safe
+    let init_script = format!(
+        "window.__AI_PANEL_DATA__ = {{ imageSrc: {:?}, framework: {:?} }};",
+        image_src, framework
+    );
+
+    let win = WebviewWindowBuilder::new(
+        &app,
+        &label,
+        WebviewUrl::App("index.html?window=ai_panel".into()),
+    )
+    .title("JustSnap AI Code")
+    .decorations(false) // Frameless for custom UI
+    .resizable(true) // Start resizable for dragging
+    .always_on_top(false) // Allow interaction with other windows
+    .skip_taskbar(false) // Process should be visible? Or skipped? Sticky uses true. Let's use false so user can find it.
+    .transparent(false) // White background
+    .shadow(true)
+    .inner_size(width, height)
+    .position(x, y)
+    .initialization_script(&init_script)
+    .build()
+    .map_err(|e| e.to_string())?;
+
+    Ok(())
+}

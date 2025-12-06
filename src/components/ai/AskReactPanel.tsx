@@ -1,8 +1,7 @@
 // JustSnap - Ask React Panel
 // Dedicated flow: generate prompt from snip -> generate framework-specific code JSON -> download/copy
 
-import { useEffect, useRef, useState } from 'react';
-import type { MouseEvent as ReactMouseEvent } from 'react';
+import { useEffect, useState } from 'react';
 import { useAskReact } from '../../hooks/useAskReact';
 import { exportText, generateFileName } from '../../utils/file';
 import type { AskFramework } from '../../types';
@@ -21,14 +20,6 @@ export function AskReactPanel({
   const [framework, setFramework] = useState<AskFramework>(initialFramework);
   const [userPrompt, setUserPrompt] = useState('');
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
-  const [position, setPosition] = useState<{ x: number; y: number }>({ x: 0, y: 60 });
-  const dragState = useRef<{ startX: number; startY: number; originX: number; originY: number; dragging: boolean }>({
-    startX: 0,
-    startY: 0,
-    originX: 0,
-    originY: 0,
-    dragging: false,
-  });
 
   const {
     generatedPrompt,
@@ -49,53 +40,6 @@ export function AskReactPanel({
   useEffect(() => {
     setFramework(initialFramework);
   }, [initialFramework]);
-
-  // Initialize position near top-right after first render
-  useEffect(() => {
-    const width = 460; // panel width estimate
-    const margin = 24;
-    const x = Math.max(margin, window.innerWidth - width - margin);
-    const y = 60;
-    setPosition({ x, y });
-  }, []);
-
-  // Drag handling
-  useEffect(() => {
-    const handleMove = (e: MouseEvent) => {
-      if (!dragState.current.dragging) return;
-      const dx = e.clientX - dragState.current.startX;
-      const dy = e.clientY - dragState.current.startY;
-      const width = 460;
-      const height = 520;
-      const margin = 8;
-      const nextX = Math.min(Math.max(margin, dragState.current.originX + dx), window.innerWidth - width - margin);
-      const nextY = Math.min(Math.max(margin, dragState.current.originY + dy), window.innerHeight - margin - height);
-      setPosition({ x: nextX, y: nextY });
-    };
-
-    const handleUp = () => {
-      if (dragState.current.dragging) {
-        dragState.current.dragging = false;
-      }
-    };
-
-    window.addEventListener('mousemove', handleMove);
-    window.addEventListener('mouseup', handleUp);
-    return () => {
-      window.removeEventListener('mousemove', handleMove);
-      window.removeEventListener('mouseup', handleUp);
-    };
-  }, []);
-
-  const startDrag = (e: ReactMouseEvent) => {
-    dragState.current = {
-      startX: e.clientX,
-      startY: e.clientY,
-      originX: position.x,
-      originY: position.y,
-      dragging: true,
-    };
-  };
 
   const frameworkLabels: Record<AskFramework, string> = {
     react: 'React',
@@ -178,19 +122,17 @@ export function AskReactPanel({
 
   return (
     <div
-      className="fixed w-[440px] max-h-[80vh] bg-white rounded-xl shadow-2xl border border-gray-100 z-50 flex flex-col pointer-events-auto"
-      style={{ left: position.x, top: position.y }}
+      className="fixed inset-0 bg-white rounded-xl shadow-2xl border border-gray-100 z-50 flex flex-col pointer-events-auto overflow-hidden"
     >
       <div
-        className="flex items-center justify-between px-4 py-3 border-b border-gray-100 cursor-move select-none"
-        onMouseDown={startDrag}
+        className="flex items-center justify-between px-4 py-3 border-b border-gray-100 select-none cursor-move"
+        data-tauri-drag-region
       >
-        <div>
+        <div data-tauri-drag-region>
           <h3 className="text-lg font-semibold text-gray-900">Generate {frameworkLabels[framework]} UI code</h3>
         </div>
         <button
           onClick={onClose}
-          onMouseDown={(e) => e.stopPropagation()}
           className="text-gray-500 hover:text-gray-700 text-sm px-3 py-1 rounded-md hover:bg-gray-50"
         >
           Close

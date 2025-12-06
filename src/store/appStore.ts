@@ -2,7 +2,7 @@
 // Manages app-wide state for overlay, capture mode, screenshots
 
 import { create } from 'zustand';
-import type { CaptureMode, Region, Screenshot, AnnotationTool, Annotation, OCRResult } from '../types';
+import type { CaptureMode, Region, Screenshot, AnnotationTool, Annotation, OCRResult, TranslationResult } from '../types';
 
 interface AppState {
   // Overlay state
@@ -30,6 +30,11 @@ interface AppState {
   ocrLoading: boolean;
   ocrProgress: number; // 0-100
   ocrError: string | null;
+
+  // Translation state
+  translationResult: TranslationResult | null;
+  translationLoading: boolean;
+  translationError: string | null;
 
   // Actions - Overlay
   showOverlay: (mode?: CaptureMode) => void;
@@ -62,6 +67,12 @@ interface AppState {
   setOCRResult: (result: OCRResult) => void;
   setOCRError: (error: string | null) => void;
   clearOCR: () => void;
+
+  // Actions - Translation
+  setTranslationLoading: (loading: boolean) => void;
+  setTranslationResult: (result: TranslationResult) => void;
+  setTranslationError: (error: string | null) => void;
+  clearTranslation: () => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -81,6 +92,11 @@ export const useAppStore = create<AppState>((set) => ({
   ocrProgress: 0,
   ocrError: null,
 
+  // Translation state
+  translationResult: null,
+  translationLoading: false,
+  translationError: null,
+
   // Overlay actions
   showOverlay: (mode = 'capture') =>
     set({
@@ -94,6 +110,9 @@ export const useAppStore = create<AppState>((set) => ({
       ocrLoading: false,
       ocrProgress: 0,
       ocrError: null,
+      translationResult: null, // Clear previous translation results
+      translationLoading: false,
+      translationError: null,
     }),
 
   hideOverlay: async () => {
@@ -170,6 +189,9 @@ export const useAppStore = create<AppState>((set) => ({
       ocrLoading: false,
       ocrProgress: 0,
       ocrError: null,
+      translationResult: null, // Clear translation results when screenshot is cleared
+      translationLoading: false,
+      translationError: null,
     }),
 
   addToHistory: (screenshot) =>
@@ -204,6 +226,15 @@ export const useAppStore = create<AppState>((set) => ({
     set({ ocrError: error, ocrLoading: false, ocrProgress: 0 }),
   clearOCR: () =>
     set({ ocrResult: null, ocrLoading: false, ocrProgress: 0, ocrError: null }),
+
+  // Translation actions
+  setTranslationLoading: (loading) => set({ translationLoading: loading }),
+  setTranslationResult: (result) =>
+    set({ translationResult: result, translationLoading: false, translationError: null }),
+  setTranslationError: (error) =>
+    set({ translationError: error, translationLoading: false }),
+  clearTranslation: () =>
+    set({ translationResult: null, translationLoading: false, translationError: null }),
 }));
 
 // Selectors for common state combinations
