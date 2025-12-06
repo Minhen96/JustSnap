@@ -110,21 +110,20 @@ export function RegionSelector({ onDragStart }: RegionSelectorProps = {}) {
       };
       setScreenshot(screenshot);
 
-      // 🚀 START BACKGROUND OCR IMMEDIATELY (Eager OCR Strategy)
-      console.log('[RegionSelector] Starting background OCR...');
+      // 🚀 START BACKGROUND OCR IMMEDIATELY
+      console.log('[RegionSelector] Starting OCR...');
       setOCRLoading(true);
       setOCRProgress(0);
 
-      // Run OCR in background without blocking UI
-      extractText(screenshot.imageData, (progress) => {
+      extractText(imageUrl, (progress) => {
         setOCRProgress(progress);
       })
         .then((result) => {
-          console.log('[RegionSelector] Background OCR completed:', result);
+          console.log('[RegionSelector] OCR completed:', result);
           setOCRResult(result);
         })
         .catch((error) => {
-          console.error('[RegionSelector] Background OCR failed:', error);
+          console.error('[RegionSelector] OCR failed:', error);
           setOCRError(error instanceof Error ? error.message : 'OCR failed');
         });
 

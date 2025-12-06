@@ -11,7 +11,6 @@ import type { AskFramework } from '../../types';
 export function ScreenshotEditor() {
   const [showAskReact, setShowAskReact] = useState(false);
   const [initialAskFramework, setInitialAskFramework] = useState<AskFramework>('react');
-  const [autoRunAsk, setAutoRunAsk] = useState(false);
   const [askPanelImage, setAskPanelImage] = useState<string | null>(null);
   const [editorHidden, setEditorHidden] = useState(false);
   const currentScreenshot = useAppStore((state) => state.currentScreenshot);
@@ -293,7 +292,6 @@ export function ScreenshotEditor() {
   const handleGenerateAiCode = useCallback(
     (framework: AskFramework) => {
       setInitialAskFramework(framework);
-      setAutoRunAsk(true);
       setEditorHidden(false);
       if (currentScreenshot?.imageData) {
         setAskPanelImage(currentScreenshot.imageData);
@@ -439,10 +437,8 @@ export function ScreenshotEditor() {
         <AskReactPanel
           screenshot={currentScreenshot?.imageData || askPanelImage || ''}
           initialFramework={initialAskFramework}
-          autoRun={autoRunAsk}
           onClose={() => {
             setShowAskReact(false);
-            setAutoRunAsk(false);
             setAskPanelImage(null);
             if (!currentScreenshot || editorHidden) {
               void closeOverlayAndReset();

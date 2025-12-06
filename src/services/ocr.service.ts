@@ -1,317 +1,137 @@
-// JustSnap - OCR Service (Tesseract.js)
+// JustSnap - OCR Service (Tesseract.js) - SIMPLIFIED VERSION
 // Reference: tech_stack.md lines 103-108, use_case.md SC-09
 
 import { createWorker, type Worker } from 'tesseract.js';
-import type { OCRResult, TextBlock } from '../types';
+import type { OCRResult } from '../types';
 
 // Singleton worker instance
 let worker: Worker | null = null;
-let isInitializing = false;
 
 /**
- * Initialize Tesseract.js worker (lazy loaded or pre-warmed)
+ * Get or create Tesseract worker
  */
 async function getWorker(): Promise<Worker> {
   if (worker) {
+    console.log('[OCR] Using existing worker');
     return worker;
   }
 
-  // If already initializing, wait for it
-  if (isInitializing) {
-    console.log('[OCR] Worker already initializing, waiting...');
-    // Poll until worker is ready
-    while (!worker && isInitializing) {
-      await new Promise(resolve => setTimeout(resolve, 100));
+  console.log('[OCR] Creating new worker...');
+  worker = await createWorker('eng', 1, {
+    logger: (m) => console.log('[OCR]', m.status, m.progress)
+  });
+  console.log('[OCR] Worker ready!');
+  return worker;
+}
+
+/**
+ * Filter out likely symbols/icons and keep only meaningful text
+ */
+function filterMeaningfulText(text: string): string {
+  if (!text) return '';
+
+  // Split into words
+  const words = text.split(/\s+/);
+
+  console.log('[OCR Filter] Input words:', words);
+
+  // Filter rules - remove symbols that OCR misreads from icons
+  const meaningfulWords = words.filter(word => {
+    const cleaned = word.trim();
+
+    // Skip empty
+    if (!cleaned) return false;
+
+    // Remove common symbol patterns that come from icons:
+    // v/, •/, */, -/, x/, etc. (tick marks, bullets, checkboxes)
+    // Pattern: single character (letter or symbol) followed by /
+    const isIconPattern = /^.\/$/i.test(cleaned); // Matches: v/, x/, •/, */, -/, etc.
+    if (isIconPattern) {
+      console.log('[OCR Filter] Removing icon pattern:', cleaned);
+      return false;
     }
-    if (worker) return worker;
-  }
 
-  isInitializing = true;
-  console.log('[OCR] Initializing Tesseract.js worker...');
-  console.time('[OCR] Worker initialization');
+    // Remove single non-alphanumeric characters
+    if (cleaned.length === 1 && !/[a-zA-Z0-9]/.test(cleaned)) {
+      console.log('[OCR Filter] Removing single symbol:', cleaned);
+      return false;
+    }
 
-  try {
-    worker = await createWorker({
-      logger: (m) => {
-        // Only log important messages to reduce noise
-        if (m.status === 'loading tesseract core' ||
-            m.status === 'initializing tesseract' ||
-            m.status === 'loading language traineddata' ||
-            m.status === 'initializing api') {
-          console.log(`[OCR] ${m.status}... ${Math.round((m.progress || 0) * 100)}%`);
-        }
-      },
-    });
+    // Remove words that are ONLY symbols/punctuation (no letters/numbers)
+    const alphanumCount = (cleaned.match(/[a-zA-Z0-9]/g) || []).length;
+    if (alphanumCount === 0) {
+      console.log('[OCR Filter] Removing pure symbols:', cleaned);
+      return false;
+    }
 
-    console.log('[OCR] Loading English language data...');
-    await worker.loadLanguage('eng');
-
-    console.log('[OCR] Initializing English...');
-    await worker.initialize('eng');
-
-    console.timeEnd('[OCR] Worker initialization');
-    console.log('[OCR] ✅ Worker ready!');
-    isInitializing = false;
-    return worker;
-  } catch (error) {
-    console.error('[OCR] ❌ Failed to initialize worker:', error);
-    worker = null;
-    isInitializing = false;
-    throw error;
-  }
-}
-
-/**
- * Warm up OCR worker in background (call on app start)
- * This downloads language files ahead of time
- */
-export function warmupOCR(): void {
-  console.log('[OCR] Starting warmup...');
-  getWorker().catch(err => {
-    console.warn('[OCR] Warmup failed (will retry on first use):', err);
+    console.log('[OCR Filter] Keeping:', cleaned);
+    return true;
   });
+
+  console.log('[OCR Filter] Output words:', meaningfulWords);
+  return meaningfulWords.join(' ');
 }
 
 /**
- * Preprocess image for better OCR accuracy
- * Converts to canvas, applies filters, returns data URL
- */
-async function preprocessImage(
-  imageData: string,
-  mode: 'default' | 'high_contrast' | 'denoise' = 'default'
-): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        reject(new Error('Failed to get canvas context'));
-        return;
-      }
-
-      // Set canvas size (only upscale if very small)
-      const minWidth = 600;
-      const scale = img.width < minWidth ? minWidth / img.width : 1;
-      canvas.width = img.width * scale;
-      canvas.height = img.height * scale;
-
-      // Draw image
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-      // Apply preprocessing based on mode
-      if (mode === 'high_contrast') {
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const data = imageData.data;
-
-        // Convert to grayscale and increase contrast
-        for (let i = 0; i < data.length; i += 4) {
-          const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-          // Increase contrast via threshold
-          const contrast = gray > 128 ? 255 : 0;
-          data[i] = data[i + 1] = data[i + 2] = contrast;
-        }
-
-        ctx.putImageData(imageData, 0, 0);
-      } else if (mode === 'denoise') {
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const data = imageData.data;
-
-        // Simple grayscale conversion
-        for (let i = 0; i < data.length; i += 4) {
-          const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-          data[i] = data[i + 1] = data[i + 2] = gray;
-        }
-
-        ctx.putImageData(imageData, 0, 0);
-      }
-
-      resolve(canvas.toDataURL('image/png'));
-    };
-
-    img.onerror = () => reject(new Error('Failed to load image'));
-    img.src = imageData;
-  });
-}
-
-/**
- * Calculate average confidence from OCR result
- */
-function calculateConfidence(result: Awaited<ReturnType<Worker['recognize']>>): number {
-  if (!result.data.words || result.data.words.length === 0) {
-    return 0;
-  }
-
-  const totalConfidence = result.data.words.reduce(
-    (sum, word) => sum + word.confidence,
-    0
-  );
-  return totalConfidence / result.data.words.length;
-}
-
-/**
- * Extract text from image using Tesseract.js with auto-retry on low confidence
- *
- * Strategy:
- * 1. Try direct image (no preprocessing) - FASTEST
- * 2. If confidence < 70%, retry with high contrast
- * 3. If still < 70%, retry with denoise
- * 4. Return best result
+ * Simple OCR - just extract text, no fancy preprocessing
  */
 export async function extractText(
   imageData: string,
   onProgress?: (progress: number) => void
 ): Promise<OCRResult> {
-  console.log('[OCR] Starting text extraction...');
-  console.log('[OCR] Image URL:', imageData.substring(0, 50) + '...');
+  console.log('[OCR] Starting...');
 
-  const tesseractWorker = await getWorker();
-  let bestResult: OCRResult | null = null;
-  let bestConfidence = 0;
+  const w = await getWorker();
+  onProgress?.(20);
 
-  // Attempt 1: Direct image (no preprocessing) - FASTEST
-  console.log('[OCR] Attempt 1: Direct image (no preprocessing)');
-  try {
-    const startTime = Date.now();
-    const result = await tesseractWorker.recognize(imageData);
-    const confidence = calculateConfidence(result);
-    const duration = Date.now() - startTime;
+  console.log('[OCR] Recognizing text...');
+  const result = await w.recognize(imageData);
+  onProgress?.(100);
 
-    console.log(`[OCR] Attempt 1 completed in ${duration}ms, confidence: ${confidence.toFixed(2)}%`);
+  const rawText = result.data.text || '';
+  const lines = result.data.lines || [];
+  const paragraphs = result.data.paragraphs || [];
 
-    bestResult = {
-      text: result.data.text,
-      confidence: confidence / 100,
-      language: 'eng',
-      blocks: result.data.lines.map((line): TextBlock => ({
-        text: line.text,
+  console.log('[OCR] Raw text:', rawText);
+  console.log('[OCR] Lines array length:', lines.length);
+  console.log('[OCR] Paragraphs array length:', paragraphs.length);
+
+  let finalText = '';
+
+  // Try to preserve line breaks using paragraphs/lines
+  if (lines.length > 0) {
+    // If lines exist, process each line separately
+    const processedLines = lines
+      .map(line => filterMeaningfulText(line.text || ''))
+      .filter(line => line.trim().length > 0);
+    finalText = processedLines.join('\n');
+    console.log('[OCR] Used lines structure, found', processedLines.length, 'lines');
+  } else if (paragraphs.length > 0) {
+    // If paragraphs exist, process each paragraph
+    const processedParagraphs = paragraphs
+      .map(para => filterMeaningfulText(para.text || ''))
+      .filter(para => para.trim().length > 0);
+    finalText = processedParagraphs.join('\n\n');
+    console.log('[OCR] Used paragraphs structure, found', processedParagraphs.length, 'paragraphs');
+  } else {
+    // Fallback: use raw text (already has line breaks from Tesseract)
+    finalText = filterMeaningfulText(rawText);
+    console.log('[OCR] Used raw text (line breaks preserved from Tesseract)');
+  }
+
+  console.log('[OCR] Final text:', finalText);
+  console.log('[OCR] Confidence:', result.data.confidence);
+
+  return {
+    text: finalText,
+    confidence: (result.data.confidence || 0) / 100,
+    language: 'eng',
+    blocks: lines
+      .map((line) => ({
+        text: line.text || '',
         bbox: line.bbox,
         confidence: line.confidence / 100,
-      })),
-    };
-    bestConfidence = confidence;
-
-    onProgress?.(50);
-
-    // If good enough, return immediately (skip preprocessing overhead)
-    if (confidence >= 70) {
-      console.log('[OCR] Good confidence, returning result');
-      return bestResult;
-    }
-
-    console.log('[OCR] Low confidence, will retry with preprocessing...');
-  } catch (error) {
-    console.error('[OCR] Attempt 1 failed:', error);
-  }
-
-  // Only retry with preprocessing if confidence was low
-  if (bestConfidence < 70) {
-    // Attempt 2: High contrast preprocessing
-    console.log('[OCR] Attempt 2: High contrast preprocessing');
-    try {
-      const startTime = Date.now();
-      const preprocessed = await preprocessImage(imageData, 'high_contrast');
-      const result = await tesseractWorker.recognize(preprocessed);
-      const confidence = calculateConfidence(result);
-      const duration = Date.now() - startTime;
-
-      console.log(`[OCR] Attempt 2 completed in ${duration}ms, confidence: ${confidence.toFixed(2)}%`);
-
-      if (confidence > bestConfidence) {
-        bestResult = {
-          text: result.data.text,
-          confidence: confidence / 100,
-          language: 'eng',
-          blocks: result.data.lines.map((line): TextBlock => ({
-            text: line.text,
-            bbox: line.bbox,
-            confidence: line.confidence / 100,
-          })),
-        };
-        bestConfidence = confidence;
-      }
-
-      onProgress?.(75);
-
-      // If good enough, return
-      if (confidence >= 70) {
-        console.log('[OCR] Good confidence after retry, returning result');
-        return bestResult!;
-      }
-    } catch (error) {
-      console.error('[OCR] Attempt 2 failed:', error);
-    }
-
-    // Attempt 3: Denoise preprocessing (last resort)
-    console.log('[OCR] Attempt 3: Denoise preprocessing');
-    try {
-      const startTime = Date.now();
-      const preprocessed = await preprocessImage(imageData, 'denoise');
-      const result = await tesseractWorker.recognize(preprocessed);
-      const confidence = calculateConfidence(result);
-      const duration = Date.now() - startTime;
-
-      console.log(`[OCR] Attempt 3 completed in ${duration}ms, confidence: ${confidence.toFixed(2)}%`);
-
-      if (confidence > bestConfidence) {
-        bestResult = {
-          text: result.data.text,
-          confidence: confidence / 100,
-          language: 'eng',
-          blocks: result.data.lines.map((line): TextBlock => ({
-            text: line.text,
-            bbox: line.bbox,
-            confidence: line.confidence / 100,
-          })),
-        };
-        bestConfidence = confidence;
-      }
-
-      onProgress?.(100);
-    } catch (error) {
-      console.error('[OCR] Attempt 3 failed:', error);
-    }
-  } else {
-    // Good confidence on first try, skip preprocessing
-    onProgress?.(100);
-  }
-
-  if (!bestResult) {
-    throw new Error('All OCR attempts failed');
-  }
-
-  console.log(
-    `[OCR] Completed with best confidence: ${(bestResult.confidence * 100).toFixed(2)}%`
-  );
-  return bestResult;
-}
-
-/**
- * Detect language of text
- */
-export async function detectLanguage(text: string): Promise<string> {
-  // Simple language detection based on character sets
-  if (/[\u4e00-\u9fa5]/.test(text)) {
-    return 'zh'; // Chinese
-  }
-  if (/[\u0600-\u06FF]/.test(text)) {
-    return 'ar'; // Arabic
-  }
-  if (/[\u0E00-\u0E7F]/.test(text)) {
-    return 'th'; // Thai
-  }
-  return 'en'; // Default to English
-}
-
-/**
- * Cleanup worker when no longer needed
- */
-export async function terminateWorker(): Promise<void> {
-  if (worker) {
-    console.log('[OCR] Terminating worker');
-    await worker.terminate();
-    worker = null;
-  }
+      }))
+      .filter((block) => block.text.trim().length > 0),
+  };
 }

@@ -11,19 +11,16 @@ interface AskReactPanelProps {
   screenshot: string; // base64 or object URL
   onClose: () => void;
   initialFramework?: AskFramework;
-  autoRun?: boolean;
 }
 
 export function AskReactPanel({
   screenshot,
   onClose,
   initialFramework = 'react',
-  autoRun = false,
 }: AskReactPanelProps) {
   const [framework, setFramework] = useState<AskFramework>(initialFramework);
   const [userPrompt, setUserPrompt] = useState('');
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
-  const [autoRunRequested, setAutoRunRequested] = useState(autoRun);
   const [position, setPosition] = useState<{ x: number; y: number }>({ x: 0, y: 60 });
   const dragState = useRef<{ startX: number; startY: number; originX: number; originY: number; dragging: boolean }>({
     startX: 0,
@@ -51,8 +48,7 @@ export function AskReactPanel({
 
   useEffect(() => {
     setFramework(initialFramework);
-    setAutoRunRequested(autoRun);
-  }, [initialFramework, autoRun]);
+  }, [initialFramework]);
 
   // Initialize position near top-right after first render
   useEffect(() => {
@@ -106,22 +102,6 @@ export function AskReactPanel({
     vue: 'Vue',
     flutter: 'Flutter',
   };
-  const frameworkOptions: Array<{ value: AskFramework; label: string; hint: string }> = [
-    { value: 'react', label: 'React', hint: 'TSX + Tailwind' },
-    { value: 'vue', label: 'Vue', hint: 'Vue 3 SFC' },
-    { value: 'flutter', label: 'Flutter', hint: 'Dart widget' },
-  ];
-
-  const handleGeneratePrompt = async () => {
-    setCopyState('idle');
-    await generatePrompt(userPrompt.trim() || undefined);
-  };
-
-  const handleGenerateCode = async () => {
-    if (!generatedPrompt) return;
-    setCopyState('idle');
-    await generateCode(generatedPrompt.prompt);
-  };
 
   const handleCopy = async () => {
     if (!codeResult?.code) return;
@@ -165,26 +145,36 @@ export function AskReactPanel({
     exportText(fileContent, fileName, 'txt');
   };
 
-  // Auto-run pipeline when triggered externally (toolbar)
+  // Auto-run code generation when panel opens
   useEffect(() => {
-    if (!autoRunRequested) return;
-    if (isPromptLoading || generatedPrompt) return;
+    // Only run once when component mounts or when framework/screenshot changes
+    if (isPromptLoading || isCodeLoading || codeResult) return;
+    
+    const runGeneration = async () => {
+      setCopyState('idle');
+      // Step 1: Generate prompt
+      const promptResult = await generatePrompt(userPrompt.trim() || undefined);
+      if (!promptResult) return;
+      
+      // Step 2: Generate code immediately after prompt
+      await generateCode(promptResult.prompt);
+    };
+    
+    void runGeneration();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [framework, screenshot]); // Only re-run when framework or screenshot changes
+
+  const handleRegenerate = async () => {
     setCopyState('idle');
     reset();
-    void generatePrompt(userPrompt.trim() || undefined);
-  }, [autoRunRequested, isPromptLoading, generatedPrompt, generatePrompt, reset, userPrompt]);
-
-  useEffect(() => {
-    if (!autoRunRequested) return;
-    if (!generatedPrompt || codeResult || isCodeLoading) return;
-    void generateCode(generatedPrompt.prompt);
-  }, [autoRunRequested, generatedPrompt, codeResult, isCodeLoading, generateCode]);
-
-  useEffect(() => {
-    if (autoRunRequested && codeResult) {
-      setAutoRunRequested(false);
-    }
-  }, [autoRunRequested, codeResult]);
+    
+    // Step 1: Generate prompt
+    const promptResult = await generatePrompt(userPrompt.trim() || undefined);
+    if (!promptResult) return;
+    
+    // Step 2: Generate code
+    await generateCode(promptResult.prompt);
+  };
 
   return (
     <div
@@ -196,8 +186,7 @@ export function AskReactPanel({
         onMouseDown={startDrag}
       >
         <div>
-          <p className="text-xs uppercase tracking-wide text-blue-600 font-semibold">Ask AI</p>
-          <h3 className="text-lg font-semibold text-gray-900">Generate UI code from this snip</h3>
+          <h3 className="text-lg font-semibold text-gray-900">Generate {frameworkLabels[framework]} UI code</h3>
         </div>
         <button
           onClick={onClose}
@@ -221,62 +210,41 @@ export function AskReactPanel({
           </div>
         </div>
 
-        {/* Framework selector + optional guidance */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label className="block text-sm font-medium text-gray-800 mb-2">Target framework</label>
-            <div className="relative">
-              <select
-                value={framework}
-                onChange={(e) => setFramework(e.target.value as AskFramework)}
-                className="w-full appearance-none rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {frameworkOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label} - {option.hint}
-                  </option>
-                ))}
-              </select>
-              <span className="pointer-events-none absolute right-3 top-2.5 text-gray-500 text-xs">v</span>
+        {/* Optional guidance - Full width */}
+        <div>
+          <label className="block text-sm font-medium text-gray-800 mb-2">Optional guidance</label>
+          <textarea
+            value={userPrompt}
+            onChange={(e) => setUserPrompt(e.target.value)}
+            placeholder="Add notes (e.g., make the card reusable with CTA)"
+            className="w-full min-h-[80px] p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+          />
+        </div>
+
+        {/* Actions - Only Generate button */}
+        <div>
+          <button
+            onClick={handleRegenerate}
+            disabled={isPromptLoading || isCodeLoading}
+            className="w-full px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium disabled:opacity-60 hover:bg-blue-700 transition-colors"
+          >
+            {isPromptLoading || isCodeLoading ? 'Generating code...' : `Generate ${frameworkLabels[framework]} code`}
+          </button>
+        </div>
+
+        {/* Loading State */}
+        {(isPromptLoading || isCodeLoading) && !codeResult && (
+          <div className="flex items-center justify-center py-8">
+            <div className="text-center">
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-2"></div>
+              <p className="text-sm text-gray-600">
+                {isPromptLoading ? 'Analyzing screenshot...' : 'Generating code...'}
+              </p>
             </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-800 mb-2">Optional guidance</label>
-            <textarea
-              value={userPrompt}
-              onChange={(e) => setUserPrompt(e.target.value)}
-              placeholder="Add notes (e.g., make the card reusable with CTA)"
-              className="w-full min-h-[80px] p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-            />
-          </div>
-        </div>
-
-        {/* Actions */}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleGeneratePrompt}
-            disabled={isPromptLoading}
-            className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium disabled:opacity-60"
-          >
-            {isPromptLoading ? 'Analyzing...' : 'Analyze snip'}
-          </button>
-          <button
-            onClick={handleGenerateCode}
-            disabled={!generatedPrompt || isCodeLoading}
-            className="px-4 py-2 rounded-lg bg-gray-900 text-white text-sm font-medium disabled:opacity-60"
-          >
-            {isCodeLoading ? 'Generating code...' : `Generate ${frameworkLabels[framework]} code`}
-          </button>
-        </div>
-
-        {/* Output */}
-        {generatedPrompt && (
-          <div className="border border-blue-100 bg-blue-50 rounded-lg p-3">
-            <p className="text-xs uppercase tracking-wide text-blue-700 font-semibold mb-1">Generated analysis</p>
-            <p className="text-sm text-blue-900 whitespace-pre-wrap">{generatedPrompt.prompt}</p>
           </div>
         )}
 
+        {/* Code Output */}
         {codeResult && (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
@@ -291,27 +259,30 @@ export function AskReactPanel({
                   onClick={handleCopy}
                   className="px-3 py-1.5 rounded-md bg-gray-100 text-gray-800 text-sm hover:bg-gray-200"
                 >
-                  {copyState === 'copied' ? 'Copied' : 'Copy code'}
+                  {copyState === 'copied' ? 'Copied ✓' : 'Copy code'}
                 </button>
               </div>
             </div>
 
             <div className="border border-gray-200 rounded-lg bg-gray-50">
-              <pre className="overflow-auto p-3 text-sm text-gray-900 whitespace-pre-wrap">{codeResult.code}</pre>
+              <pre className="overflow-auto p-3 text-sm text-gray-900 whitespace-pre-wrap max-h-[400px]">{codeResult.code}</pre>
             </div>
 
             {codeResult.styles && (
               <div className="border border-gray-200 rounded-lg bg-white p-3 text-sm text-gray-800">
                 <p className="font-semibold mb-1">Styles</p>
-                <pre className="whitespace-pre-wrap">{codeResult.styles}</pre>
+                <pre className="whitespace-pre-wrap max-h-[200px] overflow-auto">{codeResult.styles}</pre>
               </div>
             )}
-
-            {/* Props section removed per request */}
           </div>
         )}
 
-        {error && <div className="text-sm text-red-600">{error}</div>}
+        {/* Error State */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+            <p className="text-sm text-red-600">{error}</p>
+          </div>
+        )}
       </div>
     </div>
   );

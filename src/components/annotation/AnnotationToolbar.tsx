@@ -22,7 +22,6 @@ import {
   Languages,
   MessageSquare,
   FileCode,
-  Wand2,
 } from 'lucide-react';
 import { ColorPickerPopover } from './ColorPickerPopover';
 import { useAppStore } from '../../store/appStore';
@@ -235,39 +234,6 @@ export function AnnotationToolbar({
 
           {/* AI Tools */}
           <div className="flex items-center gap-1 pr-2 border-r border-gray-300">
-            <div
-              className="relative"
-              onMouseEnter={clearHideAiDropdownTimeout}
-              onMouseLeave={scheduleHideAiDropdown}
-            >
-              <button
-                onClick={() => {
-                  // small delay to avoid accidental clicks
-                  clearHideAiDropdownTimeout();
-                  setTimeout(() => setShowAiDropdown((prev) => !prev), 120);
-                }}
-                className="p-2 rounded-lg bg-blue-600 text-white hover:bg-blue-500 border border-blue-600 shadow-sm flex items-center gap-1"
-                title="AI UI Code"
-              >
-                <Wand2 size={20} />
-              </button>
-
-              {showAiDropdown && (
-                <div className="absolute top-full left-0 mt-1 bg-white rounded-lg shadow-xl border border-gray-200 min-w-[150px] overflow-hidden z-10">
-                  {(['react', 'vue', 'flutter'] as AskFramework[]).map((fw) => (
-                    <button
-                      key={fw}
-                      onClick={() => handleFrameworkSelect(fw)}
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 text-gray-800"
-                    >
-                      {fw === 'react' && 'React'}
-                      {fw === 'vue' && 'Vue'}
-                      {fw === 'flutter' && 'Flutter'}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
             {/* OCR Button with Loading Animation */}
             <button
               onClick={() => setShowOCRPanel(true)}
@@ -324,13 +290,41 @@ export function AnnotationToolbar({
             >
               <MessageSquare size={20} />
             </button>
-            <button
-              className="p-2 rounded-lg bg-white hover:bg-gray-100 text-gray-700 border border-gray-300 opacity-50 cursor-not-allowed"
-              title="Generate Code (Coming Soon)"
-              disabled
+            
+            {/* Generate Code Button with Framework Dropdown */}
+            <div
+              className="relative"
+              onMouseEnter={clearHideAiDropdownTimeout}
+              onMouseLeave={scheduleHideAiDropdown}
             >
-              <FileCode size={20} />
-            </button>
+              <button
+                onClick={() => {
+                  // small delay to avoid accidental clicks
+                  clearHideAiDropdownTimeout();
+                  setTimeout(() => setShowAiDropdown((prev) => !prev), 120);
+                }}
+                className="p-2 rounded-lg bg-blue-600 text-white hover:bg-blue-500 border border-blue-600 shadow-sm flex items-center gap-1"
+                title="Generate UI Code"
+              >
+                <FileCode size={20} />
+              </button>
+
+              {showAiDropdown && (
+                <div className="absolute top-full left-0 mt-1 bg-white rounded-lg shadow-xl border border-gray-200 min-w-[150px] overflow-hidden z-10">
+                  {(['react', 'vue', 'flutter'] as AskFramework[]).map((fw) => (
+                    <button
+                      key={fw}
+                      onClick={() => handleFrameworkSelect(fw)}
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 text-gray-800"
+                    >
+                      {fw === 'react' && 'React'}
+                      {fw === 'vue' && 'Vue'}
+                      {fw === 'flutter' && 'Flutter'}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Actions */}

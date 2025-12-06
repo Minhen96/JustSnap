@@ -19,7 +19,7 @@ import {
 // TODO: Add OpenAI API key configuration
 const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY || '';
 // Google Generative AI (Gemini) - hardcoded per request
-const GOOGLE_GENAI_KEY = 'AIzaSyBy8lpxnaeBKfqQ3XhUB1JsYbHxrMX86As';
+const GOOGLE_GENAI_KEY = 'AIzaSyCnH_WCNFor3FNk4ozsdmOplH-iqX0Mveo';
 const GEMINI_MODEL = 'gemini-2.0-flash';
 // OpenAI-compatible endpoint for Gemini (v1beta)
 const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/openai';
