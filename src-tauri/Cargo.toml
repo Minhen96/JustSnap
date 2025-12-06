@@ -39,3 +39,4 @@ chrono = "0.4"
 
 # Directory paths
 dirs = "5.0"
+tauri-plugin-dialog = "2.4.2"

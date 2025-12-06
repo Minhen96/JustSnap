@@ -38,6 +38,7 @@ interface AnnotationToolbarProps {
   onCopy: () => void;
   onSave: () => void;
   onStick: () => void;
+  isPinned?: boolean;
   onClose: () => void;
   style?: React.CSSProperties;
   className?: string;
@@ -69,6 +70,7 @@ export function AnnotationToolbar({
   onCopy,
   onSave,
   onStick,
+  isPinned = false,
   onClose,
   style,
   className,
@@ -245,10 +247,14 @@ export function AnnotationToolbar({
           <div className="flex items-center gap-1">
             <button
               onClick={onStick}
-              className="p-2 rounded-lg bg-white hover:bg-green-100 text-green-600 border border-green-300"
-              title="Stick on Screen (Always on Top)"
+              className={`p-2 rounded-lg border transition-all ${
+                isPinned 
+                  ? 'bg-green-600 text-white border-green-700 shadow-inner' 
+                  : 'bg-white hover:bg-green-50 text-green-600 border-green-200'
+              }`}
+              title={isPinned ? "Unpin from Screen" : "Stick on Screen (Always on Top)"}
             >
-              <Pin size={20} />
+              <Pin size={20} className={isPinned ? "fill-current" : ""} />
             </button>
             <button
               onClick={onCopy}

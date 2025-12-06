@@ -1,7 +1,7 @@
 // JustSnap - AI Summary Panel
 // Reference: use_case.md SC-12
 
-import type { AISummary } from '../../types';
+import type { AISummary } from '../../types/index';
 
 interface SummaryPanelProps {
   summary: AISummary | null;

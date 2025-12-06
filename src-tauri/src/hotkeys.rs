@@ -78,10 +78,24 @@ pub fn register_global_hotkey(app: &AppHandle, hotkey: Hotkey) -> Result<(), Str
                 let _ = window.set_always_on_top(true);
                 let _ = window.set_skip_taskbar(true);
                 let _ = window.set_shadow(false);
+                let _ = window.set_resizable(true); // Ensure resizable so we can set size
 
-                // Ensure it covers the whole screen
+                // Robust reset: Manually set to monitor size instead of just fullscreen
+                // This fixes issues where previous "Stick" mode geometry persists
+                if let Some(monitor) = window.current_monitor().ok().flatten() {
+                    let size = monitor.size();
+                    let scale_factor = monitor.scale_factor();
+                    let logical_width = size.width as f64 / scale_factor;
+                    let logical_height = size.height as f64 / scale_factor;
+
+                    let _ = window.set_position(tauri::LogicalPosition::new(0.0, 0.0));
+                    let _ = window.set_size(tauri::LogicalSize::new(logical_width, logical_height));
+                }
+
+                // Also set fullscreen as backup/enforcement
                 if let Err(e) = window.set_fullscreen(true) {
                     eprintln!("Failed to set fullscreen: {}", e);
+                    // Legacy fallback
                     let _ = window.maximize();
                 }
 

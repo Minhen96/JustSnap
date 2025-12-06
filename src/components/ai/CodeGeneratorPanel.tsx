@@ -2,7 +2,7 @@
 // Reference: use_case.md SC-13, feature_list.md lines 109-123
 
 import { useState } from 'react';
-import type { AICodeGeneration } from '../../types';
+import type { AICodeGeneration } from '../../types/index';
 
 interface CodeGeneratorPanelProps {
   screenshot: string;

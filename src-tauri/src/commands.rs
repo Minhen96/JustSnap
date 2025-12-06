@@ -105,15 +105,15 @@ pub async fn hide_overlay(app: tauri::AppHandle) -> Result<(), String> {
 // ============================================
 
 #[command]
-pub async fn save_image(
-    image_data: Vec<u8>,
-    file_name: String,
-    format: String,
-) -> Result<String, String> {
-    // TODO: Save image to file system
-    // Return file path
-    println!("Saving image: {} as {}", file_name, format);
-    Ok(format!("C:\\Users\\Desktop\\{}.{}", file_name, format))
+
+pub async fn save_image(path: String, image_data: Vec<u8>) -> Result<(), String> {
+    use std::fs::File;
+    use std::io::Write;
+
+    let mut file = File::create(&path).map_err(|e| e.to_string())?;
+    file.write_all(&image_data).map_err(|e| e.to_string())?;
+
+    Ok(())
 }
 
 #[command]
@@ -124,10 +124,17 @@ pub async fn save_text(_content: String, file_name: String) -> Result<String, St
 }
 
 #[command]
-pub async fn open_save_dialog(default_name: String) -> Result<Option<String>, String> {
-    // TODO: Open native save file dialog
-    println!("Opening save dialog: {}", default_name);
-    Ok(None)
+
+pub async fn open_save_dialog(app: tauri::AppHandle) -> Result<Option<String>, String> {
+    use tauri_plugin_dialog::DialogExt;
+
+    let file_path = app
+        .dialog()
+        .file()
+        .add_filter("Image", &["png"])
+        .blocking_save_file();
+
+    Ok(file_path.map(|p| p.to_string()))
 }
 
 // ============================================
@@ -241,6 +248,60 @@ pub async fn save_settings(settings: serde_json::Value) -> Result<(), String> {
 // ============================================
 
 #[command]
+pub async fn stick_window(
+    app: tauri::AppHandle,
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+) -> Result<(), String> {
+    use tauri::{LogicalPosition, LogicalSize, Manager};
+
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.unmaximize();
+        let _ = window.set_fullscreen(false);
+        // Enable decorations so user can move/resize natively
+        let _ = window.set_decorations(true);
+        let _ = window.set_resizable(true);
+        let _ = window.set_shadow(true); // Add shadow back for visibility
+
+        // Critical: Set size THEN position
+        let _ = window.set_size(LogicalSize::new(width, height));
+        let _ = window.set_position(LogicalPosition::new(x, y));
+
+        let _ = window.set_always_on_top(true);
+        let _ = window.set_ignore_cursor_events(false);
+    }
+    Ok(())
+}
+
+#[command]
+pub async fn restore_window(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri::{LogicalPosition, Manager};
+
+    // Logic to restore to "Fullscreen Overlay" mode
+    if let Some(window) = app.get_webview_window("main") {
+        if let Some(monitor) = window.current_monitor().ok().flatten() {
+            let size = monitor.size();
+            let scale_factor = monitor.scale_factor();
+            let logical_width = size.width as f64 / scale_factor;
+            let logical_height = size.height as f64 / scale_factor;
+
+            // Disable decorations for overlay
+            let _ = window.set_decorations(false);
+            let _ = window.set_shadow(false);
+
+            let _ = window.set_position(LogicalPosition::new(0.0, 0.0));
+            // Explicitly setting size is often more reliable than set_fullscreen for overlays that need to be transparent/clickable
+            let _ = window.set_size(tauri::LogicalSize::new(logical_width, logical_height));
+            let _ = window.set_resizable(true); // Keep resizable for future
+            let _ = window.set_always_on_top(true);
+        }
+    }
+    Ok(())
+}
+
+#[command]
 pub async fn show_in_tray() -> Result<(), String> {
     // TODO: Show app in system tray
     println!("Showing in tray");
@@ -251,5 +312,55 @@ pub async fn show_in_tray() -> Result<(), String> {
 pub async fn hide_from_tray() -> Result<(), String> {
     // TODO: Hide from system tray
     println!("Hiding from tray");
+    Ok(())
+}
+
+#[command]
+pub async fn save_temp_image(image_data: Vec<u8>) -> Result<String, String> {
+    use std::io::Write;
+    let mut temp_path = std::env::temp_dir();
+    let file_name = format!(
+        "justsnap_sticky_{}.png",
+        chrono::Utc::now().timestamp_millis()
+    );
+    temp_path.push(file_name);
+
+    let path_str = temp_path.to_string_lossy().to_string();
+    let mut file = std::fs::File::create(&temp_path).map_err(|e| e.to_string())?;
+    file.write_all(&image_data).map_err(|e| e.to_string())?;
+
+    Ok(path_str)
+}
+
+#[command]
+pub async fn create_sticky_window(
+    app: tauri::AppHandle,
+    image_src: String, // Expects full data URL or src
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+) -> Result<(), String> {
+    use tauri::{WebviewUrl, WebviewWindowBuilder};
+
+    let label = format!("sticky_{}", chrono::Utc::now().timestamp_micros());
+
+    // Inject src directly
+    let init_script = format!("window.__STICKY_IMAGE_SRC__ = {:?};", image_src);
+
+    let win = WebviewWindowBuilder::new(&app, &label, WebviewUrl::App("index.html".into()))
+        .title("JustSnap Sticky")
+        .decorations(true)
+        .resizable(true)
+        .always_on_top(true)
+        .skip_taskbar(true)
+        .transparent(false)
+        .shadow(true)
+        .inner_size(width, height)
+        .position(x, y)
+        .initialization_script(&init_script)
+        .build()
+        .map_err(|e| e.to_string())?;
+
     Ok(())
 }

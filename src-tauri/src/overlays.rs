@@ -1,7 +1,7 @@
 // JustSnap - Overlay Window Management
 // Handles creating and managing the fullscreen overlay for region selection
 
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 
 #[allow(dead_code)]
 pub fn create_overlay_window(_app: &AppHandle) -> Result<(), String> {

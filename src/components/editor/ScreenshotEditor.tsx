@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
-import { getCurrentWindow } from '@tauri-apps/api/window';
+import { LogicalSize, LogicalPosition, currentMonitor, getCurrentWindow } from '@tauri-apps/api/window';
+import { X } from 'lucide-react';
 import { useAppStore } from '../../store/appStore';
 import { useAnnotation } from '../../hooks/useAnnotation';
 import { CanvasStage } from '../annotation/CanvasStage';
@@ -10,8 +11,12 @@ export function ScreenshotEditor() {
   const [showAskReact, setShowAskReact] = useState(false);
   const currentScreenshot = useAppStore((state) => state.currentScreenshot);
   const clearScreenshot = useAppStore((state) => state.clearScreenshot);
+  const [feedback, setFeedback] = useState<string | null>(null);
 
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
+  // const isPinned = false; // Disabled internal stick
+  // We now use separate windows. Keeping isPinned=false allows code structure to remain valid.
+  const isPinned = false;
 
   const {
     currentTool,
@@ -38,9 +43,33 @@ export function ScreenshotEditor() {
     });
   }, [currentScreenshot]);
 
+  // Restore window logic helper
+  const restoreWindow = useCallback(async () => {
+    const win = getCurrentWindow();
+    const monitor = await currentMonitor();
+    if (monitor) {
+       // We use physical size because currentMonitor returns physical
+       // But setSize uses Logical by default unless specified? 
+       // Actually monitor.size is PhysicalSize.
+       // It's safer to use setFullscreen(true) for overlay apps or explicitly set size.
+       // For this app, let's try setting it to the monitor size.
+       // NOTE: This assumes the app is meant to be a full-screen overlay.
+       // If it fails, we might need a specific 'reset_window' command in Rust.
+       await win.setSize(new LogicalSize(monitor.size.width / monitor.scaleFactor, monitor.size.height / monitor.scaleFactor));
+       await win.setPosition(new LogicalPosition(0, 0));
+       await win.setAlwaysOnTop(true); // Reset to default overlay behavior (usually on top when active)
+    }
+  }, []);
+
   const handleClose = useCallback(async () => {
-    clearScreenshot();
-    await getCurrentWindow().hide();
+    const win = getCurrentWindow();
+    await win.hide();
+    
+    // Slight delay to allow hide animation if any, then reset
+    setTimeout(async () => {
+        clearScreenshot();
+        setFeedback(null);
+    }, 100);
   }, [clearScreenshot]);
 
   // Handle keyboard shortcuts
@@ -100,82 +129,126 @@ export function ScreenshotEditor() {
   }, [currentScreenshot]);
 
   const handleCopy = useCallback(async () => {
-    console.log('Copy to clipboard');
+    const win = getCurrentWindow();
     try {
+      // 1. Hide immediately for "instant" feel
+      await win.hide();
+      
       const dataURL = exportCanvasAsDataURL();
-
-      // Convert data URL to blob
       const response = await fetch(dataURL);
       const blob = await response.blob();
 
-      // Copy to clipboard using Clipboard API
+      // Try frontend clipboard first
+      let success = false;
       if (navigator.clipboard && window.ClipboardItem) {
-        await navigator.clipboard.write([
-          new ClipboardItem({ 'image/png': blob })
-        ]);
-        console.log('Copied to clipboard successfully!');
-      } else {
-        console.warn('Clipboard API not supported');
+        try {
+          await navigator.clipboard.write([
+            new ClipboardItem({ 'image/png': blob })
+          ]);
+          success = true;
+        } catch (err) {
+          console.warn('Frontend clipboard failed, trying backend:', err);
+        }
       }
+
+      if (!success) {
+        // Fallback to backend
+        const buffer = await blob.arrayBuffer();
+        const bytes = new Uint8Array(buffer);
+        const { invoke } = await import('@tauri-apps/api/core');
+        await invoke('copy_image_to_clipboard', { imageData: Array.from(bytes) });
+      }
+
+      // 2. Finalize
+      handleClose(); 
+
     } catch (error) {
       console.error('Failed to copy:', error);
+      // If failed, we must show the window again to inform user
+      await win.show();
+      setFeedback('Failed to copy');
     }
-  }, [exportCanvasAsDataURL]);
+  }, [exportCanvasAsDataURL, handleClose]);
 
   const handleSave = useCallback(async () => {
-    console.log('Save as image');
     try {
+      const win = getCurrentWindow();
+      // Hide window temporarily so user can see/interact with save dialog/desktop if needed
+      // But we need the dataURL first!
+      const dataURL = exportCanvasAsDataURL();
+      
+      // Convert to bytes immediately
+      const response = await fetch(dataURL);
+      const blob = await response.blob();
+      const buffer = await blob.arrayBuffer();
+      const bytes = new Uint8Array(buffer);
+
+      // Hide window to unblock view/interaction
+      await win.hide();
+
       const { invoke } = await import('@tauri-apps/api/core');
-      const path = await invoke<string>('open_save_dialog');
+      const path = await invoke<string | null>('open_save_dialog');
 
       if (path) {
-        const dataURL = exportCanvasAsDataURL();
-
-        // Convert data URL to base64
-        const base64Data = dataURL.split(',')[1];
-
-        // Convert base64 to bytes
-        const binaryString = atob(base64Data);
-        const bytes = new Uint8Array(binaryString.length);
-        for (let i = 0; i < binaryString.length; i++) {
-          bytes[i] = binaryString.charCodeAt(i);
-        }
-
         // Save via Tauri command
         await invoke('save_image', {
           path,
-          imageData: Array.from(bytes)
+          imageData: Array.from(bytes) // camelCase maps to snake_case in Rust (image_data)
         });
-
-        console.log('Saved to:', path);
+        
+        // Show window briefly to show feedback? Or just close?
+        // User asked to "do action with folder", implies they might want to open it.
+        // For now, let's just show feedback then close.
+        await win.show(); // Show back up to display toast
+        setFeedback(`Saved to ${path}`);
+        setTimeout(handleClose, 1500); 
+      } else {
+        // User cancelled, show window again so they don't get lost
+        await win.show();
       }
     } catch (error) {
       console.error('Failed to save:', error);
+      setFeedback('Failed to save image');
+      // Ensure window is back if error
+      await getCurrentWindow().show();
     }
-  }, [exportCanvasAsDataURL]);
+  }, [exportCanvasAsDataURL, handleClose]);
 
   const handleStick = useCallback(async () => {
-    console.log('Stick on screen - set always on top');
-    try {
-      const { getCurrentWindow } = await import('@tauri-apps/api/window');
-      const window = getCurrentWindow();
-      await window.setAlwaysOnTop(true);
-
-      // Optional: Show toast notification
-      alert('Window is now pinned on top! Click again to unpin.');
-
-      // TODO: Toggle state and allow unpinning
-    } catch (error) {
-      console.error('Failed to stick window:', error);
-    }
-  }, []);
+     if (!currentScreenshot) return;
+     const win = getCurrentWindow();
+     try {
+         await win.hide();
+         
+         const dataURL = exportCanvasAsDataURL();
+         
+         const { invoke } = await import('@tauri-apps/api/core');
+         // No need to save to disk, we pass the data URL directly
+         // path -> image_src
+         
+         const { x, y } = currentScreenshot.region;
+         const { width, height } = dimensions;
+         
+         await invoke('create_sticky_window', { 
+            imageSrc: dataURL,
+            x, y, width, height 
+         });
+         
+         // Close the main editor window (resetting for next capture)
+         handleClose();
+     } catch (e) {
+         console.error("Stick failed", e);
+         await win.show();
+     }
+  }, [currentScreenshot, dimensions, exportCanvasAsDataURL, handleClose]);
 
 
 
   if (!currentScreenshot) return null;
 
   // Calculate positions
-  const { x, y, width, height } = currentScreenshot.region;
+  const { x, y } = currentScreenshot.region;
+  // width/height from region might be stale if resized, using dimensions state is better
   
   // Constants for toolbar spacing
   const TOOLBAR_HEIGHT = 60; 
@@ -188,7 +261,7 @@ export function ScreenshotEditor() {
   
   // If not enough space above, try below
   if (toolbarTop < MARGIN) {
-    toolbarTop = y + height + MARGIN;
+    toolbarTop = y + dimensions.height + MARGIN;
     
     // If not enough space below (e.g. full height selection), put it inside at the top
     if (toolbarTop + TOOLBAR_HEIGHT > window.innerHeight - MARGIN) {
@@ -223,14 +296,30 @@ export function ScreenshotEditor() {
 
       {/* Main Canvas Area */}
       <div
-        className="absolute shadow-2xl rounded-lg overflow-hidden border border-gray-200 bg-white pointer-events-auto"
+        className={`absolute overflow-hidden bg-white pointer-events-auto ${isPinned ? 'cursor-move' : 'shadow-2xl border border-gray-200'}`}
         style={{ 
-          left: x,
-          top: y,
-          width: dimensions.width, 
-          height: dimensions.height 
+          left: isPinned ? 0 : x,
+          top: isPinned ? 0 : y,
+          width: isPinned ? '100%' : dimensions.width, 
+          height: isPinned ? '100%' : dimensions.height,
+          borderRadius: isPinned ? 0 : '0.5rem'
         }}
+        data-tauri-drag-region={isPinned ? "true" : undefined}
       >
+        {isPinned && (
+             <div className="absolute top-2 right-2 z-50 flex gap-1 pointer-events-auto">
+                 <div className="px-2 py-1 bg-black/50 text-white text-[10px] rounded backdrop-blur-sm pointer-events-none select-none">
+                    Pinned
+                 </div>
+                 <button 
+                    onClick={handleClose}
+                    className="p-1 bg-black/50 hover:bg-red-500 text-white rounded-full transition-colors backdrop-blur-sm cursor-pointer"
+                    title="Close Pinned Window"
+                 >
+                    <X size={14} />
+                 </button>
+             </div>
+        )}
         <CanvasStage
           imageUrl={currentScreenshot.imageData}
           annotations={annotations}
@@ -243,49 +332,63 @@ export function ScreenshotEditor() {
         />
       </div>
 
-      {/* Annotation Toolbar */}
-      <div className="pointer-events-auto">
-        <AnnotationToolbar
-          currentTool={currentTool}
-          onToolChange={setCurrentTool}
-          currentColor={currentStyle.color}
-          onColorChange={(color) => updateStyle({ color })}
-          strokeWidth={currentStyle.strokeWidth}
-          onStrokeWidthChange={(strokeWidth) => updateStyle({ strokeWidth })}
-          canUndo={canUndo}
-          canRedo={canRedo}
-          onUndo={undo}
-          onRedo={redo}
-          onCopy={handleCopy}
-          onSave={handleSave}
-          onStick={handleStick}
-          onClose={handleClose}
-          className="" // Override default positioning
-          style={{
-            top: toolbarTop,
-            left: toolbarLeft,
-            transform: 'none' // Remove centering transform
-          }}
-        />
-      </div>
+      {/* Annotation Toolbar - Only show if NOT pinned */}
+      {/* Annotation Toolbar & Sidebar - Only show if NOT pinned */}
+      {!isPinned && (
+        <>
+          <div className="pointer-events-auto">
+            <AnnotationToolbar
+              currentTool={currentTool}
+              onToolChange={setCurrentTool}
+              currentColor={currentStyle.color}
+              onColorChange={(color) => updateStyle({ color })}
+              strokeWidth={currentStyle.strokeWidth}
+              onStrokeWidthChange={(strokeWidth) => updateStyle({ strokeWidth })}
+              canUndo={canUndo}
+              canRedo={canRedo}
+              onUndo={undo}
+              onRedo={redo}
+              onCopy={handleCopy}
+              onSave={handleSave}
+              onStick={handleStick}
+              isPinned={isPinned}
+              onClose={handleClose}
+              className="" // Override default positioning
+              style={{
+                top: toolbarTop,
+                left: toolbarLeft,
+                transform: 'none' // Remove centering transform
+              }}
+            />
+          </div>
 
-      {/* Sidebar actions */}
-      <div className="fixed right-6 top-28 z-40 flex flex-col gap-3 pointer-events-auto">
-        <div className="bg-white shadow-lg rounded-xl border border-gray-200 p-3">
-          <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold mb-2">AI Actions</p>
-          <button
-            onClick={() => setShowAskReact(true)}
-            className="w-full px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-500 transition"
-          >
-            Ask React
-          </button>
-          <p className="text-[11px] text-gray-500 mt-2">
-            Send this snip to Ask React for prompt + code JSON.
-          </p>
+          <div className="fixed right-6 top-28 z-40 flex flex-col gap-3 pointer-events-auto">
+            <div className="bg-white shadow-lg rounded-xl border border-gray-200 p-3">
+              <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold mb-2">AI Actions</p>
+              <button
+                onClick={() => setShowAskReact(true)}
+                className="w-full px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-500 transition"
+              >
+                Ask React
+              </button>
+              <p className="text-[11px] text-gray-500 mt-2">
+                Send this snip to Ask React for prompt + code JSON.
+              </p>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Toast Feedback */}
+      {feedback && (
+        <div className="fixed top-10 left-1/2 transform -translate-x-1/2 z-[60] animate-in fade-in slide-in-from-top-4 duration-300">
+            <div className="bg-black/80 text-white px-6 py-3 rounded-full shadow-xl backdrop-blur-md flex items-center gap-2">
+                <span className="text-sm font-medium">{feedback}</span>
+            </div>
         </div>
-      </div>
+      )}
 
-      {showAskReact && (
+      {!isPinned && showAskReact && (
         <AskReactPanel screenshot={currentScreenshot.imageData} onClose={() => setShowAskReact(false)} />
       )}
     </div>

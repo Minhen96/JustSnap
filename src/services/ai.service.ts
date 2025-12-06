@@ -7,7 +7,7 @@ import type {
   TranslationResult,
   AskReactCodeResult,
   AskReactPromptResult,
-} from '../types';
+} from '../types/index';
 import { buildAskReactAnalysisPrompt, buildAskReactCodePrompt } from '../utils/prompts/askReactPrompt';
 
 // TODO: Add OpenAI API key configuration
