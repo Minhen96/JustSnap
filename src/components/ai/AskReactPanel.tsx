@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { useAskReact } from '../../hooks/useAskReact';
 import { exportText, generateFileName } from '../../utils/file';
 import type { AskFramework } from '../../types';
+import { X } from 'lucide-react';
 
 interface AskReactPanelProps {
   screenshot: string; // base64 or object URL
@@ -58,6 +59,7 @@ export function AskReactPanel({
     }
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleDownload = () => {
     if (!codeResult) return;
     const fileName = generateFileName(`ask-${framework}`);
@@ -121,22 +123,32 @@ export function AskReactPanel({
   };
 
   return (
-    <div
-      className="fixed inset-0 bg-white rounded-xl shadow-2xl border border-gray-100 z-50 flex flex-col pointer-events-auto overflow-hidden"
-    >
-      <div
-        className="flex items-center justify-between px-4 py-3 border-b border-gray-100 select-none cursor-move"
-        data-tauri-drag-region
+    <div className="fixed inset-0 bg-white rounded-xl shadow-2xl border border-gray-100 z-50 flex flex-col pointer-events-auto overflow-hidden">
+      {/* Header - Draggable Area */}
+      <div 
+        className="h-10 bg-gray-50 border-b flex items-center justify-between px-4 select-none"
       >
-        <div data-tauri-drag-region>
-          <h3 className="text-lg font-semibold text-gray-900">Generate {frameworkLabels[framework]} UI code</h3>
-        </div>
-        <button
-          onClick={onClose}
-          className="text-gray-500 hover:text-gray-700 text-sm px-3 py-1 rounded-md hover:bg-gray-50"
+        <div 
+          data-tauri-drag-region
+          className="flex-1 flex items-center gap-2 h-full cursor-grab active:cursor-grabbing"
         >
-          Close
-        </button>
+          <div className="font-semibold text-sm text-gray-700 pointer-events-none">
+            Generate {frameworkLabels[framework]} UI code
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <div className="text-xs text-gray-400 mr-2">
+            Autosaved to desktop
+          </div>
+          <button 
+            onClick={onClose}
+            className="p-1 hover:bg-gray-200 rounded text-gray-500 hover:text-gray-700 transition-colors z-50 cursor-pointer"
+            title="Close"
+          >
+            <X size={18} />
+          </button>
+        </div>
       </div>
 
       <div className="p-4 space-y-4 overflow-y-auto flex-1 min-h-0">

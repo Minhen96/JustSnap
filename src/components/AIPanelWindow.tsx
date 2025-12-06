@@ -28,8 +28,15 @@ export function AIPanelWindow() {
   }, []);
 
   const handleClose = async () => {
-    const win = getCurrentWindow();
-    await win.close();
+    console.log("Closing AI Panel Window...");
+    try {
+        const win = getCurrentWindow();
+        await win.hide(); // Hide visually first to avoid stuck white box
+        await win.close();
+    } catch (e) {
+        console.error("Failed to close via Tauri, trying native close", e);
+        window.close();
+    }
   };
 
   if (!data) {

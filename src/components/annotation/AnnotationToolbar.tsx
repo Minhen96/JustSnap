@@ -27,6 +27,7 @@ import { ColorPickerPopover } from './ColorPickerPopover';
 import { useAppStore } from '../../store/appStore';
 import { OCRPanel } from '../ai/OCRPanel';
 import { TranslationPanel } from '../ai/TranslationPanel';
+import { invoke } from '@tauri-apps/api/core';
 
 interface AnnotationToolbarProps {
   currentTool: AnnotationTool;

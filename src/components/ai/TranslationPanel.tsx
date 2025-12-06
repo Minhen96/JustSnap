@@ -18,6 +18,7 @@ const LANGUAGES: { code: TranslationLanguage; name: string; flag: string }[] = [
 
 export function TranslationPanel({ onClose }: TranslationPanelProps) {
   const ocrResult = useAppStore((state) => state.ocrResult);
+
   const translationResult = useAppStore((state) => state.translationResult);
   const translationLoading = useAppStore((state) => state.translationLoading);
   const translationError = useAppStore((state) => state.translationError);
@@ -30,7 +31,7 @@ export function TranslationPanel({ onClose }: TranslationPanelProps) {
 
   const handleTranslate = async () => {
     if (!ocrResult?.text) {
-      setTranslationError('No OCR text available');
+      setTranslationError('No text to translate');
       return;
     }
 
@@ -55,10 +56,10 @@ export function TranslationPanel({ onClose }: TranslationPanelProps) {
     }
   };
 
-  const hasOCRText = ocrResult && ocrResult.text.trim().length > 0;
+  const hasText = ocrResult && ocrResult.text.trim().length > 0;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-md flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
@@ -75,10 +76,10 @@ export function TranslationPanel({ onClose }: TranslationPanelProps) {
         </div>
 
         {/* Content */}
-        <div className="p-4 space-y-3">
-          {!hasOCRText ? (
+        <div className="p-4 space-y-3 flex-1 overflow-y-auto">
+          {!hasText ? (
             <p className="text-sm text-yellow-700 bg-yellow-50 border border-yellow-200 rounded p-2">
-              No OCR text. Run OCR first.
+              No text to translate.
             </p>
           ) : (
             <>
@@ -100,6 +101,13 @@ export function TranslationPanel({ onClose }: TranslationPanelProps) {
                 ))}
               </div>
 
+              {/* Source Text Preview */}
+              <div className="bg-gray-50 border border-gray-200 rounded p-2 max-h-32 overflow-y-auto">
+                <p className="text-xs text-gray-600 whitespace-pre-wrap">
+                  {ocrResult.text}
+                </p>
+              </div>
+
               {/* Translate Button */}
               <button
                 onClick={handleTranslate}
@@ -115,6 +123,19 @@ export function TranslationPanel({ onClose }: TranslationPanelProps) {
                   'Translate'
                 )}
               </button>
+
+              {/* Translating Feedback */}
+              {translationLoading && (
+                <div className="bg-blue-50 border border-blue-200 rounded p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Loader2 className="animate-spin text-blue-600" size={14} />
+                    <span className="text-sm font-medium text-blue-700">Processing...</span>
+                  </div>
+                  <div className="w-full bg-blue-200 rounded-full h-1.5 overflow-hidden">
+                    <div className="bg-blue-600 h-full rounded-full animate-pulse" style={{ width: '100%' }} />
+                  </div>
+                </div>
+              )}
 
               {/* Error Display */}
               {translationError && (

@@ -4,6 +4,7 @@
 
 ## Features
 
+### Core Screenshot Capabilities
 - **Global Hotkey**: Press `Ctrl+Shift+S` anywhere to start snipping.
 - **Smart Region Selection**: Drag to select any area of your screen with live dimension display.
 - **Instant Preview**: Immediately view your captured screenshot in the editor window.
@@ -14,12 +15,29 @@
 - **Modern UI**: Clean, transparent overlay interface with smooth transitions.
 - **High-DPI Support**: Automatic device pixel ratio scaling for crisp captures.
 
+### Annotation Tools
+- **Pen Tool**: Free-hand drawing on screenshots
+- **Highlighter**: Highlight important areas with transparency
+- **Shapes**: Add rectangles, circles, and other shapes
+- **Blur Tool**: Privacy-focused blurring for sensitive information
+- **Color Picker**: Customizable colors for all annotation tools
+
+### AI-Powered Features
+- **OCR (Optical Character Recognition)**: Extract text from screenshots with confidence scores powered by Tesseract.js
+- **Translation**: Translate extracted or selected text into multiple languages
+- **UI Code Generation**: Convert UI screenshots into code for React, Vue, Flutter, HTML/Tailwind, and Next.js
+- **AI Chat Panel**: Ask questions about your screenshots and get AI-powered insights
+
 ## Tech Stack
 
 - **Backend**: Rust (Tauri)
-- **Frontend**: React + TypeScript + Vite
-- **Styling**: TailwindCSS
+- **Frontend**: React 19 + TypeScript + Vite
+- **Styling**: TailwindCSS + Radix UI
 - **State Management**: Zustand
+- **Canvas Rendering**: Konva + React-Konva
+- **Code Editor**: Monaco Editor
+- **AI Integration**: Google Generative AI (Gemini)
+- **OCR Engine**: Tesseract.js
 
 ## Getting Started
 
@@ -79,20 +97,44 @@ npx tauri info       # Show environment info
 
 ## Usage
 
+### Basic Screenshot Capture
 1. **Launch**: The app starts with a welcome screen. It will also run in the background via the system tray.
 2. **Capture**: Press `Ctrl+Shift+S` anywhere to open the snipping overlay.
 3. **Select**: Click and drag to select a region. You'll see:
    - Live dimension display (width x height)
    - Dimmed area outside your selection
    - Blue dashed border around the selected region
-4. **Preview**: Release the mouse to capture. The screenshot opens in the preview window.
-5. **System Tray**:
-   - **Show**: Brings the welcome screen back if closed.
-   - **Quit**: Exits the application completely.
+4. **Preview**: Release the mouse to capture. The screenshot opens in the editor window.
+
+### Annotation Tools
+Once you've captured a screenshot, use the annotation toolbar to enhance your image:
+- **Pen**: Draw free-hand annotations
+- **Highlighter**: Highlight important sections with transparency
+- **Shapes**: Add rectangles, circles, and other shapes
+- **Blur**: Blur sensitive information for privacy
+- **Color Picker**: Choose custom colors for all tools
+
+### AI Features
+After capturing a screenshot, access powerful AI features:
+- **OCR**: Click the OCR button to extract text from your screenshot
+  - View confidence scores for accuracy
+  - Copy extracted text to clipboard
+- **Translation**: Translate extracted text into multiple languages
+- **Code Generation**: Convert UI screenshots into code
+  - Select your target framework (React, Vue, Flutter, etc.)
+  - View generated code in Monaco Editor
+  - Copy or export the code
+- **AI Chat**: Ask questions about your screenshot and get AI-powered insights
+
+### System Tray
+- **Show**: Brings the welcome screen back if closed
+- **Quit**: Exits the application completely
 
 ## Development Status
 
 ### Completed Features ✅
+
+#### Phase 1: Core Screenshot Functionality
 - [x] **Global Hotkey System**: `Ctrl+Shift+S` registered on app startup
 - [x] **Fullscreen Overlay**: Transparent, always-on-top overlay window
 - [x] **Region Selection**:
@@ -114,17 +156,38 @@ npx tauri info       # Show environment info
   - Hotkey status indicator
   - System tray controls
 
-### In Progress 🚧
-- [ ] **Phase 2: Annotation Tools**
-  - Drawing (Pen, Shapes)
-  - Text annotations
-  - Blur/Mosaic tool
+#### Phase 2: Annotation Tools
+- [x] **Pen Tool**: Free-hand drawing with customizable colors and stroke width
+- [x] **Highlighter Tool**: Semi-transparent highlighting
+- [x] **Shape Tool**: Rectangles, circles, and other geometric shapes
+- [x] **Blur Tool**: Privacy-focused blurring with adjustable intensity
+- [x] **Color Picker**: Radix UI-based color selection for all tools
+- [x] **Canvas Integration**: Konva-based annotation layer
 
-### Planned 📋
-- [ ] **Phase 3: AI Features**
-  - OCR (Optical Character Recognition)
-  - Text translation
-  - AI-powered UI code generation
+#### Phase 3: AI Features
+- [x] **OCR Integration**: Tesseract.js-powered text extraction
+  - Confidence scores for accuracy feedback
+  - Copy-to-clipboard functionality
+  - Progress indicators
+- [x] **Translation Panel**: Multi-language translation support
+  - Dedicated translation window
+  - Integration with extracted text
+- [x] **UI Code Generation**: AI-powered code generation
+  - Support for React, Vue, Flutter, HTML/Tailwind, Next.js
+  - Monaco Editor integration for code preview
+  - Framework selection interface
+- [x] **AI Chat Panel**: Interactive AI assistance for screenshots
+  - Powered by Google Gemini
+  - Context-aware screenshot analysis
+
+### In Progress 🚧
+- [ ] **Enhanced Code Generation**: Improving code quality and accuracy
+- [ ] **Additional Export Formats**: Support for more image formats
+- [ ] **Text Annotation Tool**: Add text directly to screenshots
+- [ ] **Cloud Storage Integration**: Save screenshots to cloud services
+- [ ] **History & Gallery**: Browse and manage past screenshots
+- [ ] **Custom Hotkeys**: User-configurable keyboard shortcuts
+- [ ] **Video Recording**: Capture screen recordings with annotations
 
 ## License
 

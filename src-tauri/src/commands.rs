@@ -386,17 +386,51 @@ pub async fn create_ai_panel_window(
         image_src, framework
     );
 
-    let win = WebviewWindowBuilder::new(
+    let _ = WebviewWindowBuilder::new(&app, &label, WebviewUrl::App("index.html#ai_panel".into()))
+        .title("JustSnap AI Code")
+        .decorations(false) // Frameless for custom UI
+        .resizable(true) // Start resizable for dragging
+        .always_on_top(false) // Allow interaction with other windows
+        .skip_taskbar(false) // Process should be visible
+        .transparent(false) // White background
+        .shadow(true)
+        .inner_size(width, height)
+        .position(x, y)
+        .initialization_script(&init_script)
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[command]
+pub async fn create_translation_window(
+    app: tauri::AppHandle,
+    text: String,
+    x: f64,
+    y: f64,
+) -> Result<(), String> {
+    use tauri::{WebviewUrl, WebviewWindowBuilder};
+
+    let label = format!("translation_{}", chrono::Utc::now().timestamp_micros());
+
+    // Inject text directly
+    let init_script = format!("window.__TRANSLATION_TEXT__ = {:?};", text);
+
+    let width = 400.0;
+    let height = 600.0;
+
+    let _ = WebviewWindowBuilder::new(
         &app,
         &label,
-        WebviewUrl::App("index.html?window=ai_panel".into()),
+        WebviewUrl::App("index.html#translation_panel".into()),
     )
-    .title("JustSnap AI Code")
-    .decorations(false) // Frameless for custom UI
-    .resizable(true) // Start resizable for dragging
-    .always_on_top(false) // Allow interaction with other windows
-    .skip_taskbar(false) // Process should be visible? Or skipped? Sticky uses true. Let's use false so user can find it.
-    .transparent(false) // White background
+    .title("JustSnap Translate")
+    .decorations(false) // Frameless
+    .resizable(true)
+    .always_on_top(false)
+    .skip_taskbar(false)
+    .transparent(false)
     .shadow(true)
     .inner_size(width, height)
     .position(x, y)

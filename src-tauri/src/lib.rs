@@ -98,22 +98,10 @@ pub fn run() {
             // Clipboard
             commands::copy_image_to_clipboard,
             commands::copy_text_to_clipboard,
-            // Window Detection
-            commands::get_window_at_position,
-            commands::get_all_windows,
-            // Monitors
-            commands::get_all_monitors,
-            // Settings
-            commands::get_settings,
-            commands::save_settings,
-            // System Tray
-            commands::show_in_tray,
-            commands::hide_from_tray,
-            commands::stick_window,
-            commands::restore_window,
             commands::save_temp_image,
             commands::create_sticky_window,
             commands::create_ai_panel_window,
+            commands::create_translation_window,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
