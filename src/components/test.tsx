@@ -1,50 +1,29 @@
-import React, { useState } from 'react';
+import React from 'react';
 
-interface JustSnapContainerProps {
-  status: string;
-  onTestOverlayClick: () => void;
+interface FeaturedFeedbackButtonProps {
+  onClick: () => void;
 }
 
-const JustSnapContainer: React.FC<JustSnapContainerProps> = ({ status, onTestOverlayClick }) => {
-  const [screenCapture, setScreenCapture] = useState(true);
-  const [ocrTranslation, setOcrTranslation] = useState(true);
-  const [screenshotToCode, setScreenshotToCode] = useState(true);
-  const [screenRecording, setScreenRecording] = useState(true);
-
+const FeaturedFeedbackButton: React.FC<FeaturedFeedbackButtonProps> = ({ onClick }) => {
   return (
-    <div className="border-2 border-dashed border-sky-500 p-4 rounded">
-      <h1 className="text-3xl font-bold text-gray-800">JustSnap</h1>
-      <h2 className="text-xl text-gray-800">AI-Powered Snipping Tool</h2>
-      <p className="text-sm text-gray-800">Status: {status}</p>
-      <button
-        className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mt-2"
-        onClick={onTestOverlayClick} // TODO: Implement test overlay functionality
+    <button
+      onClick={onClick}
+      className="flex items-center justify-center rounded-md bg-gray-900 hover:bg-gray-700 transition-colors duration-200 w-24 h-24"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="currentColor"
+        className="w-12 h-12 text-gray-400"
       >
-        Test Overlay
-      </button>
-      <ul>
-        <ListItem label="Screen Capture with Annotations" checked={screenCapture} onChange={() => setScreenCapture(!screenCapture)} />
-        <ListItem label="AI-Powered OCR & Translation" checked={ocrTranslation} onChange={() => setOcrTranslation(!ocrTranslation)} />
-        <ListItem label="Screenshot to UI Code" checked={screenshotToCode} onChange={() => setScreenshotToCode(!screenshotToCode)} />
-        <ListItem label="Screen Recording & Live Snip" checked={screenRecording} onChange={() => setScreenRecording(!screenRecording)} />
-      </ul>
-    </div>
+        <path
+          fillRule="evenodd"
+          d="M4.804 21.644a3.75 3.75 0 01-.964-7.035L12 3 21.16 14.61A3.75 3.75 0 0122.036 21.644H4.804zm7.5-.75a.75.75 0 01.75-.75h.008a.75.75 0 01.75.75v.008a.75.75 0 01-.75.75h-.008a.75.75 0 01-.75-.75V20.9zM6.75 8.25a.75.75 0 00-1.5 0v5.25a.75.75 0 001.5 0V8.25zM12.75 8.25a.75.75 0 00-1.5 0v5.25a.75.75 0 001.5 0V8.25zM18.75 8.25a.75.75 0 00-1.5 0v5.25a.75.75 0 001.5 0V8.25z"
+          clipRule="evenodd"
+        />
+      </svg>
+    </button>
   );
 };
 
-interface ListItemProps {
-  label: string;
-  checked: boolean;
-  onChange: () => void;
-}
-
-const ListItem: React.FC<ListItemProps> = ({ label, checked, onChange }) => (
-  <li className="flex items-center">
-    <label className="inline-flex items-center">
-      <input type="checkbox" className="form-checkbox h-5 w-5 text-blue-600" checked={checked} onChange={onChange} />
-      <span className="ml-2 text-gray-700">{label}</span>
-    </label>
-  </li>
-);
-
-export default JustSnapContainer;
+export default FeaturedFeedbackButton;

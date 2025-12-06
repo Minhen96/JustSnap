@@ -6,9 +6,12 @@ import { useAnnotation } from '../../hooks/useAnnotation';
 import { CanvasStage } from '../annotation/CanvasStage';
 import { AnnotationToolbar } from '../annotation/AnnotationToolbar';
 import { AskReactPanel } from '../ai/AskReactPanel';
+import type { AskFramework } from '../../types';
 
 export function ScreenshotEditor() {
   const [showAskReact, setShowAskReact] = useState(false);
+  const [initialAskFramework, setInitialAskFramework] = useState<AskFramework>('react');
+  const [autoRunAsk, setAutoRunAsk] = useState(false);
   const currentScreenshot = useAppStore((state) => state.currentScreenshot);
   const clearScreenshot = useAppStore((state) => state.clearScreenshot);
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -242,6 +245,15 @@ export function ScreenshotEditor() {
      }
   }, [currentScreenshot, dimensions, exportCanvasAsDataURL, handleClose]);
 
+  const handleGenerateAiCode = useCallback(
+    (framework: AskFramework) => {
+      setInitialAskFramework(framework);
+      setAutoRunAsk(true);
+      setShowAskReact(true);
+    },
+    []
+  );
+
 
 
   if (!currentScreenshot) return null;
@@ -351,6 +363,7 @@ export function ScreenshotEditor() {
               onCopy={handleCopy}
               onSave={handleSave}
               onStick={handleStick}
+              onGenerateAiCode={handleGenerateAiCode}
               isPinned={isPinned}
               onClose={handleClose}
               className="" // Override default positioning
@@ -366,7 +379,11 @@ export function ScreenshotEditor() {
             <div className="bg-white shadow-lg rounded-xl border border-gray-200 p-3">
               <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold mb-2">AI Actions</p>
               <button
-                onClick={() => setShowAskReact(true)}
+                onClick={() => {
+                  setInitialAskFramework('react');
+                  setAutoRunAsk(false);
+                  setShowAskReact(true);
+                }}
                 className="w-full px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-500 transition"
               >
                 AI UI Code
@@ -389,7 +406,15 @@ export function ScreenshotEditor() {
       )}
 
       {!isPinned && showAskReact && (
-        <AskReactPanel screenshot={currentScreenshot.imageData} onClose={() => setShowAskReact(false)} />
+        <AskReactPanel
+          screenshot={currentScreenshot.imageData}
+          initialFramework={initialAskFramework}
+          autoRun={autoRunAsk}
+          onClose={() => {
+            setShowAskReact(false);
+            setAutoRunAsk(false);
+          }}
+        />
       )}
     </div>
   );

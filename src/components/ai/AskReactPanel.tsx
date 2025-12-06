@@ -9,12 +9,20 @@ import type { AskFramework } from '../../types';
 interface AskReactPanelProps {
   screenshot: string; // base64 or object URL
   onClose: () => void;
+  initialFramework?: AskFramework;
+  autoRun?: boolean;
 }
 
-export function AskReactPanel({ screenshot, onClose }: AskReactPanelProps) {
-  const [framework, setFramework] = useState<AskFramework>('react');
+export function AskReactPanel({
+  screenshot,
+  onClose,
+  initialFramework = 'react',
+  autoRun = false,
+}: AskReactPanelProps) {
+  const [framework, setFramework] = useState<AskFramework>(initialFramework);
   const [userPrompt, setUserPrompt] = useState('');
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
+  const [autoRunRequested, setAutoRunRequested] = useState(autoRun);
 
   const {
     generatedPrompt,
@@ -24,11 +32,18 @@ export function AskReactPanel({ screenshot, onClose }: AskReactPanelProps) {
     error,
     generatePrompt,
     generateCode,
+    reset,
   } = useAskReact(screenshot, framework);
 
   useEffect(() => {
     setCopyState('idle');
-  }, [framework]);
+    reset();
+  }, [framework, reset]);
+
+  useEffect(() => {
+    setFramework(initialFramework);
+    setAutoRunRequested(autoRun);
+  }, [initialFramework, autoRun]);
 
   const frameworkLabels: Record<AskFramework, string> = {
     react: 'React',
@@ -93,6 +108,27 @@ export function AskReactPanel({ screenshot, onClose }: AskReactPanelProps) {
 
     exportText(fileContent, fileName, 'txt');
   };
+
+  // Auto-run pipeline when triggered externally (toolbar)
+  useEffect(() => {
+    if (!autoRunRequested) return;
+    if (isPromptLoading || generatedPrompt) return;
+    setCopyState('idle');
+    reset();
+    void generatePrompt(userPrompt.trim() || undefined);
+  }, [autoRunRequested, isPromptLoading, generatedPrompt, generatePrompt, reset, userPrompt]);
+
+  useEffect(() => {
+    if (!autoRunRequested) return;
+    if (!generatedPrompt || codeResult || isCodeLoading) return;
+    void generateCode(generatedPrompt.prompt);
+  }, [autoRunRequested, generatedPrompt, codeResult, isCodeLoading, generateCode]);
+
+  useEffect(() => {
+    if (autoRunRequested && codeResult) {
+      setAutoRunRequested(false);
+    }
+  }, [autoRunRequested, codeResult]);
 
   return (
     <div className="fixed right-4 top-20 w-[440px] max-h-[80vh] bg-white rounded-xl shadow-2xl border border-gray-100 z-50 flex flex-col pointer-events-auto">
