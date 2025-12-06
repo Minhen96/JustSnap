@@ -4,6 +4,7 @@ import { useAppStore } from './store/appStore';
 import { SnipOverlay } from './components/snipping/SnipOverlay';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ScreenshotEditor } from './components/editor/ScreenshotEditor';
+import SearchInput from './components/test';
 
 // Check if we're running in Tauri (v1 or v2)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -139,6 +140,12 @@ function App() {
               </div>
             </div>
 
+            {/* Test component preview */}
+            <div className="bg-white rounded-lg shadow-md p-6 max-w-md">
+              <h3 className="text-lg font-semibold mb-3">Test: SearchInput component</h3>
+              <SearchInput />
+            </div>
+
             <p className="text-sm text-gray-500">
               Phase 1: Complete ✅ • Phase 2: In Progress 🚧
             </p>
@@ -163,7 +170,7 @@ function App() {
       )}
 
       {/* Debug Info - Remove in production */}
-      <div className="fixed bottom-2 right-2 bg-black/80 text-white text-xs p-4 rounded z-[100] max-w-md overflow-auto max-h-40 font-mono">
+      {/* <div className="fixed bottom-2 right-2 bg-black/80 text-white text-xs p-4 rounded z-[100] max-w-md overflow-auto max-h-40 font-mono">
         <div className="font-bold border-b border-gray-600 mb-2">Debug Log:</div>
         {debugLogs.map((log, i) => (
           <div key={i} className="mb-1">{log}</div>
@@ -171,7 +178,7 @@ function App() {
         <div className="mt-2 text-gray-400">
           Tauri: {isTauri ? 'Yes' : 'No'} | Active: {isActive ? 'Yes' : 'No'}
         </div>
-      </div>
+      </div> */}
     </>
   );
 }
