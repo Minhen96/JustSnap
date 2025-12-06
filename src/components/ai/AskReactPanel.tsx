@@ -1,7 +1,8 @@
 // JustSnap - Ask React Panel
 // Dedicated flow: generate prompt from snip -> generate framework-specific code JSON -> download/copy
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type { MouseEvent as ReactMouseEvent } from 'react';
 import { useAskReact } from '../../hooks/useAskReact';
 import { exportText, generateFileName } from '../../utils/file';
 import type { AskFramework } from '../../types';
@@ -9,12 +10,28 @@ import type { AskFramework } from '../../types';
 interface AskReactPanelProps {
   screenshot: string; // base64 or object URL
   onClose: () => void;
+  initialFramework?: AskFramework;
+  autoRun?: boolean;
 }
 
-export function AskReactPanel({ screenshot, onClose }: AskReactPanelProps) {
-  const [framework, setFramework] = useState<AskFramework>('react');
+export function AskReactPanel({
+  screenshot,
+  onClose,
+  initialFramework = 'react',
+  autoRun = false,
+}: AskReactPanelProps) {
+  const [framework, setFramework] = useState<AskFramework>(initialFramework);
   const [userPrompt, setUserPrompt] = useState('');
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
+  const [autoRunRequested, setAutoRunRequested] = useState(autoRun);
+  const [position, setPosition] = useState<{ x: number; y: number }>({ x: 0, y: 60 });
+  const dragState = useRef<{ startX: number; startY: number; originX: number; originY: number; dragging: boolean }>({
+    startX: 0,
+    startY: 0,
+    originX: 0,
+    originY: 0,
+    dragging: false,
+  });
 
   const {
     generatedPrompt,
@@ -24,11 +41,65 @@ export function AskReactPanel({ screenshot, onClose }: AskReactPanelProps) {
     error,
     generatePrompt,
     generateCode,
+    reset,
   } = useAskReact(screenshot, framework);
 
   useEffect(() => {
     setCopyState('idle');
-  }, [framework]);
+    reset();
+  }, [framework, reset]);
+
+  useEffect(() => {
+    setFramework(initialFramework);
+    setAutoRunRequested(autoRun);
+  }, [initialFramework, autoRun]);
+
+  // Initialize position near top-right after first render
+  useEffect(() => {
+    const width = 460; // panel width estimate
+    const margin = 24;
+    const x = Math.max(margin, window.innerWidth - width - margin);
+    const y = 60;
+    setPosition({ x, y });
+  }, []);
+
+  // Drag handling
+  useEffect(() => {
+    const handleMove = (e: MouseEvent) => {
+      if (!dragState.current.dragging) return;
+      const dx = e.clientX - dragState.current.startX;
+      const dy = e.clientY - dragState.current.startY;
+      const width = 460;
+      const height = 520;
+      const margin = 8;
+      const nextX = Math.min(Math.max(margin, dragState.current.originX + dx), window.innerWidth - width - margin);
+      const nextY = Math.min(Math.max(margin, dragState.current.originY + dy), window.innerHeight - margin - height);
+      setPosition({ x: nextX, y: nextY });
+    };
+
+    const handleUp = () => {
+      if (dragState.current.dragging) {
+        dragState.current.dragging = false;
+      }
+    };
+
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleUp);
+    };
+  }, []);
+
+  const startDrag = (e: ReactMouseEvent) => {
+    dragState.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      originX: position.x,
+      originY: position.y,
+      dragging: true,
+    };
+  };
 
   const frameworkLabels: Record<AskFramework, string> = {
     react: 'React',
@@ -94,16 +165,43 @@ export function AskReactPanel({ screenshot, onClose }: AskReactPanelProps) {
     exportText(fileContent, fileName, 'txt');
   };
 
+  // Auto-run pipeline when triggered externally (toolbar)
+  useEffect(() => {
+    if (!autoRunRequested) return;
+    if (isPromptLoading || generatedPrompt) return;
+    setCopyState('idle');
+    reset();
+    void generatePrompt(userPrompt.trim() || undefined);
+  }, [autoRunRequested, isPromptLoading, generatedPrompt, generatePrompt, reset, userPrompt]);
+
+  useEffect(() => {
+    if (!autoRunRequested) return;
+    if (!generatedPrompt || codeResult || isCodeLoading) return;
+    void generateCode(generatedPrompt.prompt);
+  }, [autoRunRequested, generatedPrompt, codeResult, isCodeLoading, generateCode]);
+
+  useEffect(() => {
+    if (autoRunRequested && codeResult) {
+      setAutoRunRequested(false);
+    }
+  }, [autoRunRequested, codeResult]);
+
   return (
-    <div className="fixed right-4 top-20 w-[440px] max-h-[80vh] bg-white rounded-xl shadow-2xl border border-gray-100 z-50 flex flex-col pointer-events-auto">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+    <div
+      className="fixed w-[440px] max-h-[80vh] bg-white rounded-xl shadow-2xl border border-gray-100 z-50 flex flex-col pointer-events-auto"
+      style={{ left: position.x, top: position.y }}
+    >
+      <div
+        className="flex items-center justify-between px-4 py-3 border-b border-gray-100 cursor-move select-none"
+        onMouseDown={startDrag}
+      >
         <div>
           <p className="text-xs uppercase tracking-wide text-blue-600 font-semibold">Ask AI</p>
           <h3 className="text-lg font-semibold text-gray-900">Generate UI code from this snip</h3>
-          <p className="text-sm text-gray-600">Pick React, Vue, or Flutter and run analysis + code generation.</p>
         </div>
         <button
           onClick={onClose}
+          onMouseDown={(e) => e.stopPropagation()}
           className="text-gray-500 hover:text-gray-700 text-sm px-3 py-1 rounded-md hover:bg-gray-50"
         >
           Close
@@ -171,32 +269,6 @@ export function AskReactPanel({ screenshot, onClose }: AskReactPanelProps) {
           </button>
         </div>
 
-        {/* Status */}
-        <div className="grid grid-cols-2 gap-3 text-sm">
-          <div className="border border-gray-200 rounded-lg p-3">
-            <p className="text-xs text-gray-500 mb-1">Step 1</p>
-            <p className="font-semibold text-gray-800">Image analysis</p>
-            <p className="text-gray-600 text-sm mt-1">
-              {generatedPrompt
-                ? 'Analysis ready'
-                : isPromptLoading
-                ? 'Analyzing snip...'
-                : 'Awaiting generation'}
-            </p>
-          </div>
-          <div className="border border-gray-200 rounded-lg p-3">
-            <p className="text-xs text-gray-500 mb-1">Step 2</p>
-            <p className="font-semibold text-gray-800">{frameworkLabels[framework]} code JSON</p>
-            <p className="text-gray-600 text-sm mt-1">
-              {codeResult
-                ? 'Code ready'
-                : isCodeLoading
-                ? 'Generating...'
-                : 'Requires prompt'}
-            </p>
-          </div>
-        </div>
-
         {/* Output */}
         {generatedPrompt && (
           <div className="border border-blue-100 bg-blue-50 rounded-lg p-3">
@@ -213,7 +285,6 @@ export function AskReactPanel({ screenshot, onClose }: AskReactPanelProps) {
                   {frameworkLabels[framework]} result
                 </p>
                 <h4 className="text-base font-semibold text-gray-900">{codeResult.name}</h4>
-                <p className="text-sm text-gray-600">{codeResult.description}</p>
               </div>
               <div className="flex items-center gap-2">
                 <button
@@ -221,12 +292,6 @@ export function AskReactPanel({ screenshot, onClose }: AskReactPanelProps) {
                   className="px-3 py-1.5 rounded-md bg-gray-100 text-gray-800 text-sm hover:bg-gray-200"
                 >
                   {copyState === 'copied' ? 'Copied' : 'Copy code'}
-                </button>
-                <button
-                  onClick={handleDownload}
-                  className="px-3 py-1.5 rounded-md bg-blue-600 text-white text-sm hover:bg-blue-500"
-                >
-                  Download .txt
                 </button>
               </div>
             </div>
@@ -242,18 +307,7 @@ export function AskReactPanel({ screenshot, onClose }: AskReactPanelProps) {
               </div>
             )}
 
-            {codeResult.props && (
-              <div className="border border-gray-200 rounded-lg bg-white p-3 text-sm text-gray-800">
-                <p className="font-semibold mb-1">Props</p>
-                <ul className="list-disc pl-5 space-y-1">
-                  {Object.entries(codeResult.props).map(([key, val]) => (
-                    <li key={key}>
-                      <span className="font-semibold">{key}</span>: {val}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+            {/* Props section removed per request */}
           </div>
         )}
 

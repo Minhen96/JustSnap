@@ -1,8 +1,8 @@
 // JustSnap - Annotation Toolbar
 // Reference: use_case.md lines 68-90 (Screen Capture toolbar)
 
-import { useCallback, useState, useRef } from 'react';
-import type { AnnotationTool } from '../../types';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { AnnotationTool, AskFramework } from '../../types';
 import {
   Pencil,
   Highlighter,
@@ -18,10 +18,7 @@ import {
   Save,
   Pin,
   X,
-  Sparkles,
-  Languages,
-  MessageSquare,
-  FileCode,
+  Wand2,
 } from 'lucide-react';
 import { ColorPickerPopover } from './ColorPickerPopover';
 
@@ -39,6 +36,7 @@ interface AnnotationToolbarProps {
   onCopy: () => void;
   onSave: () => void;
   onStick: () => void;
+  onGenerateAiCode: (framework: AskFramework) => void;
   isPinned?: boolean;
   onClose: () => void;
   style?: React.CSSProperties;
@@ -59,11 +57,32 @@ export function AnnotationToolbar({
   onCopy,
   onSave,
   onStick,
+  onGenerateAiCode,
   isPinned = false,
   onClose,
   style,
   className,
 }: AnnotationToolbarProps) {
+  const [showAiDropdown, setShowAiDropdown] = useState(false);
+  const hideAiDropdownTimeoutRef = useRef<number | null>(null);
+
+  const clearHideAiDropdownTimeout = () => {
+    if (hideAiDropdownTimeoutRef.current) {
+      window.clearTimeout(hideAiDropdownTimeoutRef.current);
+      hideAiDropdownTimeoutRef.current = null;
+    }
+  };
+
+  const scheduleHideAiDropdown = () => {
+    clearHideAiDropdownTimeout();
+    hideAiDropdownTimeoutRef.current = window.setTimeout(() => {
+      setShowAiDropdown(false);
+      hideAiDropdownTimeoutRef.current = null;
+    }, 450);
+  };
+
+  useEffect(() => () => clearHideAiDropdownTimeout(), []);
+
   const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
   const colorButtonRef = useRef<HTMLButtonElement>(null);
   
@@ -96,6 +115,11 @@ export function AnnotationToolbar({
     },
     [currentTool, onToolChange]
   );
+
+  const handleFrameworkSelect = (framework: AskFramework) => {
+    setShowAiDropdown(false);
+    onGenerateAiCode(framework);
+  };
 
   return (
     <div 
@@ -192,36 +216,41 @@ export function AnnotationToolbar({
             </button>
           </div>
 
-          {/* AI Tools (Placeholder) */}
+          {/* AI Tools */}
           <div className="flex items-center gap-1 pr-2 border-r border-gray-300">
-            <button
-              className="p-2 rounded-lg bg-white hover:bg-gray-100 text-gray-700 border border-gray-300 opacity-50 cursor-not-allowed"
-              title="OCR (Coming Soon)"
-              disabled
+            <div
+              className="relative"
+              onMouseEnter={clearHideAiDropdownTimeout}
+              onMouseLeave={scheduleHideAiDropdown}
             >
-              <Sparkles size={20} />
-            </button>
-            <button
-              className="p-2 rounded-lg bg-white hover:bg-gray-100 text-gray-700 border border-gray-300 opacity-50 cursor-not-allowed"
-              title="Translate (Coming Soon)"
-              disabled
-            >
-              <Languages size={20} />
-            </button>
-            <button
-              className="p-2 rounded-lg bg-white hover:bg-gray-100 text-gray-700 border border-gray-300 opacity-50 cursor-not-allowed"
-              title="AI Chat (Coming Soon)"
-              disabled
-            >
-              <MessageSquare size={20} />
-            </button>
-            <button
-              className="p-2 rounded-lg bg-white hover:bg-gray-100 text-gray-700 border border-gray-300 opacity-50 cursor-not-allowed"
-              title="Generate Code (Coming Soon)"
-              disabled
-            >
-              <FileCode size={20} />
-            </button>
+              <button
+                onClick={() => {
+                  // small delay to avoid accidental clicks
+                  clearHideAiDropdownTimeout();
+                  setTimeout(() => setShowAiDropdown((prev) => !prev), 120);
+                }}
+                className="p-2 rounded-lg bg-blue-600 text-white hover:bg-blue-500 border border-blue-600 shadow-sm flex items-center gap-1"
+                title="AI UI Code"
+              >
+                <Wand2 size={20} />
+              </button>
+
+              {showAiDropdown && (
+                <div className="absolute top-full left-0 mt-1 bg-white rounded-lg shadow-xl border border-gray-200 min-w-[150px] overflow-hidden z-10">
+                  {(['react', 'vue', 'flutter'] as AskFramework[]).map((fw) => (
+                    <button
+                      key={fw}
+                      onClick={() => handleFrameworkSelect(fw)}
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 text-gray-800"
+                    >
+                      {fw === 'react' && 'React'}
+                      {fw === 'vue' && 'Vue'}
+                      {fw === 'flutter' && 'Flutter'}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Actions */}
