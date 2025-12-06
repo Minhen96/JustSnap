@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react';
 import type { AnnotationTool, Annotation, AnnotationStyle } from '../types';
 
 export function useAnnotation() {
-  const [currentTool, setCurrentTool] = useState<AnnotationTool>('none');
+  const [currentTool, setCurrentTool] = useState<AnnotationTool>('rectangle');
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [currentStyle, setCurrentStyle] = useState<AnnotationStyle>({
     color: '#ef4444', // red-500

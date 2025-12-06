@@ -5,7 +5,11 @@ import { useState, useRef } from 'react';
 import { useAppStore } from '../../store/appStore';
 import type { Region } from '../../types';
 
-export function RegionSelector() {
+interface RegionSelectorProps {
+  onDragStart?: () => void;
+}
+
+export function RegionSelector({ onDragStart }: RegionSelectorProps = {}) {
   const startSelection = useAppStore((state) => state.startSelection);
   const updateSelection = useAppStore((state) => state.updateSelection);
   const finishSelection = useAppStore((state) => state.finishSelection);
@@ -24,6 +28,7 @@ export function RegionSelector() {
     setIsDragging(true);
     setStartPos({ x: clientX, y: clientY });
     startSelection();
+    onDragStart?.(); // Notify parent that dragging started
     
     // Initial zero-size region
     const region = { x: clientX, y: clientY, width: 0, height: 0 };

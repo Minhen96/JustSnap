@@ -106,11 +106,11 @@ export function AnnotationToolbar({
         <div className="flex items-center gap-2">
           {/* Annotation Tools */}
           <div className="flex items-center gap-1 pr-2 border-r border-gray-300">
-            <ToolButton tool="pen" icon={Pencil} label="Pen (P)" />
-            <ToolButton tool="highlighter" icon={Highlighter} label="Highlighter (H)" />
             <ToolButton tool="rectangle" icon={Square} label="Rectangle (R)" />
             <ToolButton tool="circle" icon={Circle} label="Circle (C)" />
             <ToolButton tool="arrow" icon={ArrowRight} label="Arrow (A)" />
+            <ToolButton tool="pen" icon={Pencil} label="Pen (P)" />
+            <ToolButton tool="highlighter" icon={Highlighter} label="Highlighter (H)" />
             <ToolButton tool="text" icon={Type} label="Text (T)" />
             <ToolButton tool="blur" icon={Droplet} label="Blur (B)" />
           </div>

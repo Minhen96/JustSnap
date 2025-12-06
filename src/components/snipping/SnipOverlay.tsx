@@ -1,7 +1,7 @@
 // JustSnap - Fullscreen Overlay Component
 // Reference: use_case.md lines 22-36
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useAppStore } from '../../store/appStore';
 import { RegionSelector } from './RegionSelector';
 import type { CaptureMode } from '../../types';
@@ -9,6 +9,7 @@ import type { CaptureMode } from '../../types';
 export function SnipOverlay() {
   const mode = useAppStore((state) => state.currentMode);
   const setMode = useAppStore((state) => state.setMode);
+  const [isSelecting, setIsSelecting] = useState(false);
 
   // Handle ESC key to cancel
   useEffect(() => {
@@ -27,8 +28,9 @@ export function SnipOverlay() {
       {/* Darkened overlay background is now handled by RegionSelector for better control */}
       {mode !== 'capture' && <div className="absolute inset-0 bg-black/40" />}
 
-      {/* Mode Selector Bar - Top */}
-      <div className="absolute top-6 left-1/2 -translate-x-1/2 flex gap-2 bg-white rounded-lg shadow-2xl p-2 z-10 animate-slideDown">
+      {/* Mode Selector Bar - Top - Hide when selecting */}
+      {!isSelecting && (
+        <div className="absolute top-6 left-1/2 -translate-x-1/2 flex gap-2 bg-white rounded-lg shadow-2xl p-2 z-10 animate-slideDown">
         <ModeButton
           mode="capture"
           currentMode={mode}
@@ -59,6 +61,7 @@ export function SnipOverlay() {
           Live
         </ModeButton>
       </div>
+      )}
 
       {/* Hint text */}
       <div className="absolute top-24 left-1/2 -translate-x-1/2 text-white text-sm bg-black/60 px-4 py-2 rounded-lg animate-fadeIn">
@@ -67,7 +70,7 @@ export function SnipOverlay() {
 
       {/* Region selector */}
       <div className="absolute inset-0 cursor-crosshair">
-        {mode === 'capture' && <RegionSelector />}
+        {mode === 'capture' && <RegionSelector onDragStart={() => setIsSelecting(true)} />}
         {mode !== 'capture' && (
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-white text-lg bg-black/70 px-6 py-4 rounded-lg">
             {mode === 'scrolling' && '📜 Scrolling Screenshot - Coming in Phase 3'}

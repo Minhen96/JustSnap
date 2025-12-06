@@ -21,11 +21,11 @@ export function Toolbar() {
   const hideOverlay = useAppStore((state) => state.hideOverlay);
 
   const tools: { id: AnnotationTool; icon: React.ElementType; label: string }[] = [
-    { id: 'none', icon: MousePointer2, label: 'Select' },
-    { id: 'pen', icon: Pencil, label: 'Pen' },
     { id: 'rectangle', icon: Square, label: 'Rect' },
     { id: 'circle', icon: Circle, label: 'Circle' },
     { id: 'arrow', icon: ArrowRight, label: 'Arrow' },
+    { id: 'none', icon: MousePointer2, label: 'Select' },
+    { id: 'pen', icon: Pencil, label: 'Pen' },
     { id: 'text', icon: Type, label: 'Text' },
     { id: 'eraser', icon: Eraser, label: 'Eraser' },
   ];
