@@ -18,9 +18,15 @@ import {
   Save,
   Pin,
   X,
+  ScanText,
+  Languages,
+  MessageSquare,
+  FileCode,
   Wand2,
 } from 'lucide-react';
 import { ColorPickerPopover } from './ColorPickerPopover';
+import { useAppStore } from '../../store/appStore';
+import { OCRPanel } from '../ai/OCRPanel';
 
 interface AnnotationToolbarProps {
   currentTool: AnnotationTool;
@@ -84,7 +90,13 @@ export function AnnotationToolbar({
   useEffect(() => () => clearHideAiDropdownTimeout(), []);
 
   const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
+  const [showOCRPanel, setShowOCRPanel] = useState(false);
   const colorButtonRef = useRef<HTMLButtonElement>(null);
+
+  // OCR State from store
+  const ocrLoading = useAppStore((state) => state.ocrLoading);
+  const ocrResult = useAppStore((state) => state.ocrResult);
+  const ocrError = useAppStore((state) => state.ocrError);
   
   const ToolButton = useCallback(
     ({
@@ -122,11 +134,16 @@ export function AnnotationToolbar({
   };
 
   return (
-    <div 
-      className={`absolute z-50 ${className || 'top-4 left-1/2 transform -translate-x-1/2'}`}
-      style={style}
-    >
-      <div className="bg-white/95 backdrop-blur-sm rounded-xl shadow-2xl border border-gray-200 p-3">
+    <>
+      {/* OCR Results Panel */}
+      {showOCRPanel && <OCRPanel onClose={() => setShowOCRPanel(false)} />}
+
+      {/* Toolbar */}
+      <div
+        className={`absolute z-50 ${className || 'top-4 left-1/2 transform -translate-x-1/2'}`}
+        style={style}
+      >
+        <div className="bg-white/95 backdrop-blur-sm rounded-xl shadow-2xl border border-gray-200 p-3">
         <div className="flex items-center gap-2">
           {/* Annotation Tools */}
           <div className="flex items-center gap-1 pr-2 border-r border-gray-300">
@@ -251,6 +268,69 @@ export function AnnotationToolbar({
                 </div>
               )}
             </div>
+            {/* OCR Button with Loading Animation */}
+            <button
+              onClick={() => setShowOCRPanel(true)}
+              className={`
+                relative p-2 rounded-lg transition-all border border-gray-300
+                ${ocrResult
+                  ? 'bg-green-50 text-green-600 border-green-300'
+                  : ocrLoading
+                  ? 'bg-blue-50 text-blue-600 border-blue-300'
+                  : ocrError
+                  ? 'bg-red-50 text-red-600 border-red-300'
+                  : 'bg-white hover:bg-purple-50 text-gray-700 hover:text-purple-600'
+                }
+              `}
+              title={ocrResult ? 'View OCR Results (Ready ✓)' : ocrLoading ? 'OCR Processing...' : ocrError ? 'OCR Failed (Retry)' : 'Extract Text (OCR)'}
+            >
+              {/* Border Loading Animation */}
+              {ocrLoading && (
+                <div className="absolute inset-0 rounded-lg overflow-hidden pointer-events-none">
+                  <div
+                    className="absolute inset-0 border-2 border-transparent rounded-lg"
+                    style={{
+                      borderTopColor: '#3b82f6',
+                      borderRightColor: '#3b82f6',
+                      animation: 'spin 2s linear infinite'
+                    }}
+                  />
+                </div>
+              )}
+
+              {/* Ready Indicator */}
+              {ocrResult && !ocrLoading && (
+                <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white shadow-sm" />
+              )}
+
+              {/* Error Indicator */}
+              {ocrError && !ocrLoading && (
+                <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white shadow-sm" />
+              )}
+
+              <ScanText size={20} className="relative z-10" />
+            </button>
+            <button
+              className="p-2 rounded-lg bg-white hover:bg-gray-100 text-gray-700 border border-gray-300 opacity-50 cursor-not-allowed"
+              title="Translate (Coming Soon)"
+              disabled
+            >
+              <Languages size={20} />
+            </button>
+            <button
+              className="p-2 rounded-lg bg-white hover:bg-gray-100 text-gray-700 border border-gray-300 opacity-50 cursor-not-allowed"
+              title="AI Chat (Coming Soon)"
+              disabled
+            >
+              <MessageSquare size={20} />
+            </button>
+            <button
+              className="p-2 rounded-lg bg-white hover:bg-gray-100 text-gray-700 border border-gray-300 opacity-50 cursor-not-allowed"
+              title="Generate Code (Coming Soon)"
+              disabled
+            >
+              <FileCode size={20} />
+            </button>
           </div>
 
           {/* Actions */}
@@ -291,5 +371,6 @@ export function AnnotationToolbar({
         </div>
       </div>
     </div>
+    </>
   );
 }

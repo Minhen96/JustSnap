@@ -2,7 +2,7 @@
 // Manages app-wide state for overlay, capture mode, screenshots
 
 import { create } from 'zustand';
-import type { CaptureMode, Region, Screenshot, AnnotationTool, Annotation } from '../types';
+import type { CaptureMode, Region, Screenshot, AnnotationTool, Annotation, OCRResult } from '../types';
 
 interface AppState {
   // Overlay state
@@ -24,6 +24,12 @@ interface AppState {
   // UI state
   showToolbar: boolean;
   isProcessing: boolean;
+
+  // OCR state
+  ocrResult: OCRResult | null;
+  ocrLoading: boolean;
+  ocrProgress: number; // 0-100
+  ocrError: string | null;
 
   // Actions - Overlay
   showOverlay: (mode?: CaptureMode) => void;
@@ -49,6 +55,13 @@ interface AppState {
 
   // Actions - UI
   setProcessing: (isProcessing: boolean) => void;
+
+  // Actions - OCR
+  setOCRLoading: (loading: boolean) => void;
+  setOCRProgress: (progress: number) => void;
+  setOCRResult: (result: OCRResult) => void;
+  setOCRError: (error: string | null) => void;
+  clearOCR: () => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -63,6 +76,10 @@ export const useAppStore = create<AppState>((set) => ({
   annotations: [],
   showToolbar: false,
   isProcessing: false,
+  ocrResult: null,
+  ocrLoading: false,
+  ocrProgress: 0,
+  ocrError: null,
 
   // Overlay actions
   showOverlay: (mode = 'capture') =>
@@ -73,6 +90,10 @@ export const useAppStore = create<AppState>((set) => ({
       isSelecting: false,
       showToolbar: false,
       currentScreenshot: null, // Clear previous screenshot to prevent editor overlap
+      ocrResult: null, // Clear previous OCR results
+      ocrLoading: false,
+      ocrProgress: 0,
+      ocrError: null,
     }),
 
   hideOverlay: async () => {
@@ -145,6 +166,10 @@ export const useAppStore = create<AppState>((set) => ({
       currentScreenshot: null,
       annotations: [],
       currentTool: 'none',
+      ocrResult: null, // Clear OCR results when screenshot is cleared
+      ocrLoading: false,
+      ocrProgress: 0,
+      ocrError: null,
     }),
 
   addToHistory: (screenshot) =>
@@ -169,6 +194,16 @@ export const useAppStore = create<AppState>((set) => ({
 
   // UI actions
   setProcessing: (isProcessing) => set({ isProcessing }),
+
+  // OCR actions
+  setOCRLoading: (loading) => set({ ocrLoading: loading }),
+  setOCRProgress: (progress) => set({ ocrProgress: progress }),
+  setOCRResult: (result) =>
+    set({ ocrResult: result, ocrLoading: false, ocrProgress: 100, ocrError: null }),
+  setOCRError: (error) =>
+    set({ ocrError: error, ocrLoading: false, ocrProgress: 0 }),
+  clearOCR: () =>
+    set({ ocrResult: null, ocrLoading: false, ocrProgress: 0, ocrError: null }),
 }));
 
 // Selectors for common state combinations

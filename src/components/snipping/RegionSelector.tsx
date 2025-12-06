@@ -4,6 +4,7 @@
 import { useState, useRef } from 'react';
 import { useAppStore } from '../../store/appStore';
 import type { Region } from '../../types';
+import { extractText } from '../../services/ocr.service';
 
 interface RegionSelectorProps {
   onDragStart?: () => void;
@@ -15,6 +16,10 @@ export function RegionSelector({ onDragStart }: RegionSelectorProps = {}) {
   const finishSelection = useAppStore((state) => state.finishSelection);
   const setScreenshot = useAppStore((state) => state.setScreenshot);
   const setProcessing = useAppStore((state) => state.setProcessing);
+  const setOCRLoading = useAppStore((state) => state.setOCRLoading);
+  const setOCRProgress = useAppStore((state) => state.setOCRProgress);
+  const setOCRResult = useAppStore((state) => state.setOCRResult);
+  const setOCRError = useAppStore((state) => state.setOCRError);
 
   const [isDragging, setIsDragging] = useState(false);
   const [startPos, setStartPos] = useState<{ x: number; y: number } | null>(null);
@@ -96,13 +101,32 @@ export function RegionSelector({ onDragStart }: RegionSelectorProps = {}) {
       const imageUrl = URL.createObjectURL(blob);
 
       // Update store
-      setScreenshot({
+      const screenshot = {
         id: crypto.randomUUID(),
         imageData: imageUrl,
         region,
         timestamp: Date.now(),
-        mode: 'capture',
-      });
+        mode: 'capture' as const,
+      };
+      setScreenshot(screenshot);
+
+      // 🚀 START BACKGROUND OCR IMMEDIATELY (Eager OCR Strategy)
+      console.log('[RegionSelector] Starting background OCR...');
+      setOCRLoading(true);
+      setOCRProgress(0);
+
+      // Run OCR in background without blocking UI
+      extractText(screenshot.imageData, (progress) => {
+        setOCRProgress(progress);
+      })
+        .then((result) => {
+          console.log('[RegionSelector] Background OCR completed:', result);
+          setOCRResult(result);
+        })
+        .catch((error) => {
+          console.error('[RegionSelector] Background OCR failed:', error);
+          setOCRError(error instanceof Error ? error.message : 'OCR failed');
+        });
 
     } catch (error) {
       console.error('Failed to capture screen:', error);
