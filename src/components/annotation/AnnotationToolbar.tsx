@@ -1,7 +1,7 @@
 // JustSnap - Annotation Toolbar
 // Reference: use_case.md lines 68-90 (Screen Capture toolbar)
 
-import { useCallback } from 'react';
+import { useCallback, useState, useRef } from 'react';
 import type { AnnotationTool } from '../../types';
 import {
   Pencil,
@@ -23,6 +23,7 @@ import {
   MessageSquare,
   FileCode,
 } from 'lucide-react';
+import { ColorPickerPopover } from './ColorPickerPopover';
 
 interface AnnotationToolbarProps {
   currentTool: AnnotationTool;
@@ -44,18 +45,6 @@ interface AnnotationToolbarProps {
   className?: string;
 }
 
-const PRESET_COLORS = [
-  '#ef4444', // red-500
-  '#f97316', // orange-500
-  '#eab308', // yellow-500
-  '#22c55e', // green-500
-  '#3b82f6', // blue-500
-  '#8b5cf6', // purple-500
-  '#ec4899', // pink-500
-  '#000000', // black
-  '#ffffff', // white
-];
-
 export function AnnotationToolbar({
   currentTool,
   onToolChange,
@@ -75,6 +64,9 @@ export function AnnotationToolbar({
   style,
   className,
 }: AnnotationToolbarProps) {
+  const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
+  const colorButtonRef = useRef<HTMLButtonElement>(null);
+  
   const ToolButton = useCallback(
     ({
       tool,
@@ -125,43 +117,32 @@ export function AnnotationToolbar({
 
           {/* Color Picker */}
           <div className="flex items-center gap-1 pr-2 border-r border-gray-300">
-            <div className="relative group">
-              <button
-                className="p-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-100"
-                title="Color"
-              >
+            <button
+              ref={colorButtonRef}
+              onClick={() => setIsColorPickerOpen(!isColorPickerOpen)}
+              className="p-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-100 relative"
+              title="Color"
+            >
+              <div className="relative">
                 <Palette size={20} className="text-gray-700" />
-              </button>
-
-              {/* Color picker dropdown */}
-              <div className="absolute top-full mt-1 left-0 bg-white rounded-lg shadow-xl border border-gray-200 p-2 hidden group-hover:block">
-                <div className="grid grid-cols-3 gap-1">
-                  {PRESET_COLORS.map((color) => (
-                    <button
-                      key={color}
-                      onClick={() => onColorChange(color)}
-                      className={`
-                        w-8 h-8 rounded-md border-2 transition-all
-                        ${currentColor === color ? 'border-blue-500 scale-110' : 'border-gray-300'}
-                      `}
-                      style={{ backgroundColor: color }}
-                      title={color}
-                    />
-                  ))}
-                </div>
-
-                {/* Custom color input */}
-                <div className="mt-2 pt-2 border-t border-gray-200">
-                  <input
-                    type="color"
-                    value={currentColor}
-                    onChange={(e) => onColorChange(e.target.value)}
-                    className="w-full h-8 rounded cursor-pointer"
-                  />
-                </div>
+                <div
+                  className="absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-white"
+                  style={{ backgroundColor: currentColor }}
+                />
               </div>
-            </div>
+            </button>
 
+            <ColorPickerPopover
+              currentColor={currentColor}
+              onColorChange={onColorChange}
+              isOpen={isColorPickerOpen}
+              onClose={() => setIsColorPickerOpen(false)}
+              buttonRef={colorButtonRef}
+            />
+          </div>
+
+          {/* Stroke Width */}
+          <div className="flex items-center gap-1 pr-2 border-r border-gray-300">
             {/* Stroke width slider */}
             <div className="relative group">
               <button
