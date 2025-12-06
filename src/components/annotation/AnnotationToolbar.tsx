@@ -1,7 +1,7 @@
 // JustSnap - Annotation Toolbar
 // Reference: use_case.md lines 68-90 (Screen Capture toolbar)
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AnnotationTool, AskFramework } from '../../types';
 import {
   Pencil,
@@ -75,6 +75,24 @@ export function AnnotationToolbar({
   className,
 }: AnnotationToolbarProps) {
   const [showAiDropdown, setShowAiDropdown] = useState(false);
+  const hideAiDropdownTimeoutRef = useRef<number | null>(null);
+
+  const clearHideAiDropdownTimeout = () => {
+    if (hideAiDropdownTimeoutRef.current) {
+      window.clearTimeout(hideAiDropdownTimeoutRef.current);
+      hideAiDropdownTimeoutRef.current = null;
+    }
+  };
+
+  const scheduleHideAiDropdown = () => {
+    clearHideAiDropdownTimeout();
+    hideAiDropdownTimeoutRef.current = window.setTimeout(() => {
+      setShowAiDropdown(false);
+      hideAiDropdownTimeoutRef.current = null;
+    }, 450);
+  };
+
+  useEffect(() => () => clearHideAiDropdownTimeout(), []);
 
   const ToolButton = useCallback(
     ({
@@ -221,10 +239,15 @@ export function AnnotationToolbar({
           <div className="flex items-center gap-1 pr-2 border-r border-gray-300">
             <div
               className="relative"
-              onMouseLeave={() => setShowAiDropdown(false)}
+              onMouseEnter={clearHideAiDropdownTimeout}
+              onMouseLeave={scheduleHideAiDropdown}
             >
               <button
-                onClick={() => setShowAiDropdown((prev) => !prev)}
+                onClick={() => {
+                  // small delay to avoid accidental clicks
+                  clearHideAiDropdownTimeout();
+                  setTimeout(() => setShowAiDropdown((prev) => !prev), 120);
+                }}
                 className="p-2 rounded-lg bg-blue-600 text-white hover:bg-blue-500 border border-blue-600 shadow-sm flex items-center gap-1"
                 title="AI UI Code"
               >

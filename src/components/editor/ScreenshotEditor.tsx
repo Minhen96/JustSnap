@@ -37,17 +37,6 @@ export function ScreenshotEditor() {
     updateStyle,
   } = useAnnotation();
 
-  // Calculate canvas dimensions based on screenshot
-  useEffect(() => {
-    if (!currentScreenshot) return;
-
-    // Use original region dimensions
-    setDimensions({ 
-      width: currentScreenshot.region.width, 
-      height: currentScreenshot.region.height 
-    });
-  }, [currentScreenshot]);
-
   // Restore window logic helper
   const restoreWindow = useCallback(async () => {
     const win = getCurrentWindow();
@@ -66,6 +55,45 @@ export function ScreenshotEditor() {
     }
   }, []);
 
+  const shrinkWindowForPanelOnly = useCallback(async () => {
+    const win = getCurrentWindow();
+    const monitor = await currentMonitor();
+    const width = 520;
+    const height = 620;
+    const margin = 24;
+    if (monitor) {
+      const logicalWidth = monitor.size.width / monitor.scaleFactor;
+      const logicalHeight = monitor.size.height / monitor.scaleFactor;
+      const posX = Math.max(margin, logicalWidth - width - margin);
+      const posY = Math.max(margin, 60);
+      await win.setSize(new LogicalSize(width, height));
+      await win.setPosition(new LogicalPosition(posX, posY));
+      await win.setAlwaysOnTop(false); // allow interacting with other apps
+    } else {
+      await win.setSize(new LogicalSize(width, height));
+      await win.setPosition(new LogicalPosition(margin, margin));
+      await win.setAlwaysOnTop(false);
+    }
+  }, []);
+
+  // Calculate canvas dimensions based on screenshot
+  useEffect(() => {
+    if (!currentScreenshot) return;
+
+    // Use original region dimensions
+    setDimensions({ 
+      width: currentScreenshot.region.width, 
+      height: currentScreenshot.region.height 
+    });
+  }, [currentScreenshot]);
+
+  // If editor was hidden for panel-only mode and we get a new screenshot, restore full window
+  useEffect(() => {
+    if (!editorHidden && currentScreenshot) {
+      restoreWindow();
+    }
+  }, [editorHidden, currentScreenshot, restoreWindow]);
+
   const closeOverlayAndReset = useCallback(async () => {
     const win = getCurrentWindow();
     await win.hide();
@@ -82,11 +110,15 @@ export function ScreenshotEditor() {
   const handleClose = useCallback(async () => {
     // If AI panel is open, keep overlay visible for the panel and hide editor UI instead
     if (showAskReact && (askPanelImage || currentScreenshot?.imageData)) {
+      if (!askPanelImage && currentScreenshot?.imageData) {
+        setAskPanelImage(currentScreenshot.imageData);
+      }
       setEditorHidden(true);
+      await shrinkWindowForPanelOnly();
       return;
     }
     await closeOverlayAndReset();
-  }, [askPanelImage, closeOverlayAndReset, currentScreenshot, showAskReact]);
+  }, [askPanelImage, closeOverlayAndReset, currentScreenshot, showAskReact, shrinkWindowForPanelOnly]);
 
   // Handle keyboard shortcuts
   useEffect(() => {

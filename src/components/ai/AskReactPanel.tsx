@@ -198,7 +198,6 @@ export function AskReactPanel({
         <div>
           <p className="text-xs uppercase tracking-wide text-blue-600 font-semibold">Ask AI</p>
           <h3 className="text-lg font-semibold text-gray-900">Generate UI code from this snip</h3>
-          <p className="text-sm text-gray-600">Pick React, Vue, or Flutter and run analysis + code generation.</p>
         </div>
         <button
           onClick={onClose}
@@ -270,32 +269,6 @@ export function AskReactPanel({
           </button>
         </div>
 
-        {/* Status */}
-        <div className="grid grid-cols-2 gap-3 text-sm">
-          <div className="border border-gray-200 rounded-lg p-3">
-            <p className="text-xs text-gray-500 mb-1">Step 1</p>
-            <p className="font-semibold text-gray-800">Image analysis</p>
-            <p className="text-gray-600 text-sm mt-1">
-              {generatedPrompt
-                ? 'Analysis ready'
-                : isPromptLoading
-                ? 'Analyzing snip...'
-                : 'Awaiting generation'}
-            </p>
-          </div>
-          <div className="border border-gray-200 rounded-lg p-3">
-            <p className="text-xs text-gray-500 mb-1">Step 2</p>
-            <p className="font-semibold text-gray-800">{frameworkLabels[framework]} code JSON</p>
-            <p className="text-gray-600 text-sm mt-1">
-              {codeResult
-                ? 'Code ready'
-                : isCodeLoading
-                ? 'Generating...'
-                : 'Requires prompt'}
-            </p>
-          </div>
-        </div>
-
         {/* Output */}
         {generatedPrompt && (
           <div className="border border-blue-100 bg-blue-50 rounded-lg p-3">
@@ -312,7 +285,6 @@ export function AskReactPanel({
                   {frameworkLabels[framework]} result
                 </p>
                 <h4 className="text-base font-semibold text-gray-900">{codeResult.name}</h4>
-                <p className="text-sm text-gray-600">{codeResult.description}</p>
               </div>
               <div className="flex items-center gap-2">
                 <button
@@ -320,12 +292,6 @@ export function AskReactPanel({
                   className="px-3 py-1.5 rounded-md bg-gray-100 text-gray-800 text-sm hover:bg-gray-200"
                 >
                   {copyState === 'copied' ? 'Copied' : 'Copy code'}
-                </button>
-                <button
-                  onClick={handleDownload}
-                  className="px-3 py-1.5 rounded-md bg-blue-600 text-white text-sm hover:bg-blue-500"
-                >
-                  Download .txt
                 </button>
               </div>
             </div>
@@ -341,18 +307,7 @@ export function AskReactPanel({
               </div>
             )}
 
-            {codeResult.props && (
-              <div className="border border-gray-200 rounded-lg bg-white p-3 text-sm text-gray-800">
-                <p className="font-semibold mb-1">Props</p>
-                <ul className="list-disc pl-5 space-y-1">
-                  {Object.entries(codeResult.props).map(([key, val]) => (
-                    <li key={key}>
-                      <span className="font-semibold">{key}</span>: {val}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+            {/* Props section removed per request */}
           </div>
         )}
 
