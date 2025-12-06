@@ -72,10 +72,11 @@ export const useAppStore = create<AppState>((set) => ({
       selectedRegion: null,
       isSelecting: false,
       showToolbar: false,
+      currentScreenshot: null, // Clear previous screenshot to prevent editor overlap
     }),
 
   hideOverlay: async () => {
-    // Call backend to minimize window
+    // Call backend to minimize/hide window
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const isTauri = !!(window as any).__TAURI_INTERNALS__ || '__TAURI__' in window;
@@ -83,6 +84,12 @@ export const useAppStore = create<AppState>((set) => ({
       if (isTauri) {
         console.log('Calling hide_overlay command...');
         const { invoke } = await import('@tauri-apps/api/core');
+        const { getCurrentWindow } = await import('@tauri-apps/api/window');
+
+        // Explicitly hide the window
+        await getCurrentWindow().hide();
+
+        // Also call backend command if needed for other cleanup
         await invoke('hide_overlay');
         console.log('hide_overlay command executed');
       } else {
@@ -91,6 +98,9 @@ export const useAppStore = create<AppState>((set) => ({
     } catch (e) {
       console.error('Failed to hide overlay window:', e);
     }
+
+    // Small delay to ensure window is hidden before state reset (prevents Welcome Screen flash)
+    await new Promise(resolve => setTimeout(resolve, 200));
 
     set({
       isOverlayActive: false,

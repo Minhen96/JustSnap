@@ -70,7 +70,6 @@ export function RegionSelector() {
   const captureRegion = async (region: Region) => {
     try {
       setProcessing(true);
-      console.log('Capturing region:', region);
 
       // Import Tauri API dynamically
       const { invoke } = await import('@tauri-apps/api/core');
@@ -85,8 +84,6 @@ export function RegionSelector() {
         width: Math.round(region.width * scale),
         height: Math.round(region.height * scale),
       });
-
-      console.log('Capture success, data length:', imageData.length);
 
       // Convert raw bytes to Blob/URL
       const u8Array = new Uint8Array(imageData);

@@ -9,7 +9,6 @@ import type { CaptureMode } from '../../types';
 export function SnipOverlay() {
   const mode = useAppStore((state) => state.currentMode);
   const setMode = useAppStore((state) => state.setMode);
-  const hide = useAppStore((state) => state.hideOverlay);
 
   // Handle ESC key to cancel
   useEffect(() => {

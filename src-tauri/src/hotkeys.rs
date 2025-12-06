@@ -35,20 +35,72 @@ pub fn register_global_hotkey(app: &AppHandle, hotkey: Hotkey) -> Result<(), Str
         .on_shortcut(shortcut, move |_app, _shortcut, _event| {
             println!("Global hotkey triggered!");
 
-            // Get the main window
+            // 1. Hide window to capture clean screen
             if let Some(window) = app_handle.get_webview_window("main") {
-                // Make it fullscreen and always on top
-                let _ = window.set_fullscreen(true);
-                let _ = window.set_always_on_top(true);
-                let _ = window.set_focus();
-                let _ = window.unminimize();
-                let _ = window.show();
-
-                // CRITICAL: Enable mouse interaction!
-                let _ = window.set_ignore_cursor_events(false);
+                let _ = window.hide();
             }
 
-            // Emit event to frontend
+            // Give the OS a moment to repaint the background
+            std::thread::sleep(std::time::Duration::from_millis(100));
+
+            println!("Starting screen capture...");
+            let capture_result = tauri::async_runtime::block_on(async {
+                crate::screen_capture::capture_full_screen().await
+            });
+
+            match capture_result {
+                Ok(image_data) => {
+                    println!("Screen captured successfully. Bytes: {}", image_data.len());
+
+                    // Emit a small debug event first to verify channel
+                    let _ = app_handle.emit("capture-debug", "Capture success! Sending data...");
+
+                    // Emit the image data
+                    if let Err(e) = app_handle.emit("screen-capture-ready", image_data) {
+                        eprintln!("Failed to emit screen capture event: {}", e);
+                    } else {
+                        println!("Screen capture event emitted!");
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Failed to capture screen: {}", e);
+                    let _ = app_handle.emit("capture-debug", format!("Capture failed: {}", e));
+                }
+            }
+
+            // 2. Get the main window and show it
+            if let Some(window) = app_handle.get_webview_window("main") {
+                println!("Setting window to overlay mode...");
+
+                // Basic window setup
+                // We use an opaque window (transparent: false) but with no decorations
+                let _ = window.set_decorations(false);
+                let _ = window.set_always_on_top(true);
+                let _ = window.set_skip_taskbar(true);
+                let _ = window.set_shadow(false);
+
+                // Ensure it covers the whole screen
+                if let Err(e) = window.set_fullscreen(true) {
+                    eprintln!("Failed to set fullscreen: {}", e);
+                    let _ = window.maximize();
+                }
+
+                // Ensure window is visible and focused
+                let _ = window.show();
+                let _ = window.set_focus();
+                let _ = window.unminimize();
+
+                // Enable mouse interaction
+                let _ = window.set_ignore_cursor_events(false);
+
+                println!(
+                    "Window setup complete. Visible: {:?}, Focused: {:?}",
+                    window.is_visible(),
+                    window.is_focused()
+                );
+            }
+
+            // Emit event to frontend to trigger UI state change
             if let Err(e) = app_handle.emit("hotkey-triggered", ()) {
                 eprintln!("Failed to emit hotkey event: {}", e);
             }

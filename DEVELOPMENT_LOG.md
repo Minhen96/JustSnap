@@ -166,23 +166,107 @@ JustSnap is an AI-powered desktop snipping tool that combines:
 
 ---
 
+#### Step 2.1: Region Selection Enhancement ✅ COMPLETED
+**Date**: December 6, 2024
+**Task**: Implement advanced region selection features
+
+**What was done**:
+- **Drag-to-Select**: Implemented smooth mouse-based region selection.
+- **Live Dimensions Tooltip**: Shows real-time width x height during selection.
+- **SVG Overlay with Hole Effect**:
+  - Dimmed background (rgba(0,0,0,0.4))
+  - Clear "hole" showing the selected region
+  - Used SVG path with `fill-rule="evenodd"` for proper masking
+- **Visual Feedback**:
+  - Blue dashed border (`#3b82f6`) around selection
+  - Crosshair cursor for precision
+  - Minimum size validation (10x10 pixels) to avoid accidental clicks
+- **Bi-directional Selection**: Supports dragging in any direction (handles negative width/height)
+- **DPI Scaling**: Properly scales coordinates using `window.devicePixelRatio` for accurate capture on high-DPI monitors
+
+**Technical Details**:
+- Component: `src/components/snipping/RegionSelector.tsx`
+- Uses React hooks (`useState`, `useRef`) for state management
+- Zustand store integration for global state
+- Dynamic SVG path generation for overlay effect
+
+**Status**: ✅ Complete
+
+---
+
+#### Step 2.2: System Tray & Welcome Screen ✅ COMPLETED
+**Date**: December 6, 2024
+**Task**: Improve system tray and welcome screen UX
+
+**What was done**:
+- **System Tray Menu**:
+  - **Show**: Brings back the welcome screen when clicked
+    - Calls `window.show()`, `window.set_focus()`, `window.unminimize()`
+    - Enables mouse interaction with `set_ignore_cursor_events(false)`
+  - **Quit**: Exits the application with `app.exit(0)`
+  - Menu appears on left-click for quick access
+- **Welcome Screen**:
+  - Shows when app starts (not just in background)
+  - Displays hotkey status indicator (green = ready, yellow = initializing)
+  - Feature showcase with checkmarks
+  - Development phase progress indicator
+  - Test button for manual overlay trigger (dev only)
+  - Automatically hides when:
+    - Overlay is active (`isOverlayActive`)
+    - A screenshot is captured (`currentScreenshot`)
+- **Window State Management**:
+  - Proper handling of show/hide states
+  - Prevents "zombie" windows
+  - Clean transitions between states
+
+**Technical Details**:
+- Backend: `src-tauri/src/lib.rs` (tray setup)
+- Frontend: `src/App.tsx` (welcome screen logic)
+- Conditional rendering based on Zustand store state
+
+**Status**: ✅ Complete
+
+---
+
 ## Progress Summary
 
 ### Completed ✅
-- **Project Structure**: Full Tauri + React setup.
-- **Core Loop**: Hotkey -> Overlay -> Select -> Capture -> Preview -> Close.
-- **System Integration**: Tray icon, background startup, global hotkeys.
-- **UI/UX**: Smooth transitions, transparent overlay, responsive toolbar.
+- **Project Structure**: Full Tauri + React setup with modular architecture.
+- **Core Snipping Loop**:
+  - Hotkey (`Ctrl+Shift+S`) → Overlay → Region Selection → Capture → Preview
+- **Region Selection**:
+  - Drag-to-select with live dimension display
+  - SVG-based dimming with transparent selection area
+  - Visual feedback (border, tooltip, cursor)
+  - Minimum size validation
+- **Screen Capture**:
+  - High-DPI support with automatic scaling
+  - Rust backend using `xcap` crate
+  - PNG format with proper encoding
+- **System Integration**:
+  - System tray with Show/Quit options
+  - Background mode with proper window state management
+  - Global hotkey registration on startup
+- **Welcome Screen**:
+  - Feature showcase and status indicators
+  - Conditional visibility based on app state
+  - Debug panel for development
+- **UI/UX**:
+  - Smooth transitions and animations
+  - Transparent overlay with proper layering
+  - Clean, modern design with TailwindCSS
 
 ### Up Next 📋
-- **Phase 2: Annotation Tools**
-  - Integrate Konva.js for drawing.
-  - Implement Pen, Highlighter, Shapes.
-  - Add Text and Blur tools.
+- **Phase 3: Annotation Tools**
+  - Integrate Konva.js for canvas-based drawing
+  - Implement Pen, Highlighter, Shapes tools
+  - Add Text annotations and Blur/Mosaic tool
+  - Build annotation toolbar with tool selection
+  - Add color picker and stroke width controls
 
 ---
 
 **Last Updated**: December 6, 2024
-**Current Phase**: Phase 1 ✅ COMPLETED
-**Next Milestone**: Phase 2 - Annotation Tools
+**Current Phase**: Phase 2 ✅ COMPLETED
+**Next Milestone**: Phase 3 - Annotation Tools
 

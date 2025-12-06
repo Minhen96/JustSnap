@@ -83,20 +83,18 @@ pub async fn hide_overlay(app: tauri::AppHandle) -> Result<(), String> {
 
     // Get the main window
     if let Some(window) = app.get_webview_window("main") {
-        // Restore window state
+        // Hide the window completely
+        let _ = window.hide();
+
+        // Restore window state (optional, but good for next time)
         let _ = window.set_fullscreen(false);
         let _ = window.set_always_on_top(false);
-        let _ = window.unmaximize();
+        let _ = window.set_skip_taskbar(true); // Keep skipped from taskbar
+        let _ = window.set_shadow(false);
+        let _ = window.set_decorations(false);
 
-        // Make window click-through (ignore cursor events)
-        // This ensures that even if hide() fails or is slow, the user can click through
-        let _ = window.set_ignore_cursor_events(true);
-
-        // Hide the window
-        if let Err(e) = window.hide() {
-            eprintln!("Failed to hide window: {}", e);
-            let _ = window.minimize();
-        }
+        // Re-enable cursor events
+        let _ = window.set_ignore_cursor_events(false);
     }
 
     Ok(())
