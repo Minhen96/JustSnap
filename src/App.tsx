@@ -144,7 +144,6 @@ function App() {
             </p>
           </div>
         </div>
-      </div>
       )}
 
       {/* LAYER 4: SnipOverlay */}

@@ -76,7 +76,7 @@ export function AskReactPanel({ screenshot, onClose }: AskReactPanelProps) {
   };
 
   return (
-    <div className="fixed right-4 top-20 w-[440px] max-h-[80vh] bg-white rounded-xl shadow-2xl border border-gray-100 z-50 flex flex-col">
+    <div className="fixed right-4 top-20 w-[440px] max-h-[80vh] bg-white rounded-xl shadow-2xl border border-gray-100 z-50 flex flex-col pointer-events-auto">
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
         <div>
           <p className="text-xs uppercase tracking-wide text-blue-600 font-semibold">Ask React</p>

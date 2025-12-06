@@ -42,7 +42,7 @@ export async function exportScreenshot(
   const blob = dataUrlToBlob(imageDataUrl);
 
   // Determine file extension
-  let extension = options.format;
+  let extension: string = options.format;
   if (options.format === 'jpg') extension = 'jpeg';
 
   const fullFileName = `${fileName}.${extension}`;

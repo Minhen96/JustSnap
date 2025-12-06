@@ -270,7 +270,7 @@ export function ScreenshotEditor() {
       </div>
 
       {/* Sidebar actions */}
-      <div className="fixed right-6 top-28 z-40 flex flex-col gap-3">
+      <div className="fixed right-6 top-28 z-40 flex flex-col gap-3 pointer-events-auto">
         <div className="bg-white shadow-lg rounded-xl border border-gray-200 p-3">
           <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold mb-2">AI Actions</p>
           <button
