@@ -12,6 +12,8 @@ export function ScreenshotEditor() {
   const [showAskReact, setShowAskReact] = useState(false);
   const [initialAskFramework, setInitialAskFramework] = useState<AskFramework>('react');
   const [autoRunAsk, setAutoRunAsk] = useState(false);
+  const [askPanelImage, setAskPanelImage] = useState<string | null>(null);
+  const [editorHidden, setEditorHidden] = useState(false);
   const currentScreenshot = useAppStore((state) => state.currentScreenshot);
   const clearScreenshot = useAppStore((state) => state.clearScreenshot);
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -64,7 +66,7 @@ export function ScreenshotEditor() {
     }
   }, []);
 
-  const handleClose = useCallback(async () => {
+  const closeOverlayAndReset = useCallback(async () => {
     const win = getCurrentWindow();
     await win.hide();
     
@@ -72,8 +74,19 @@ export function ScreenshotEditor() {
     setTimeout(async () => {
         clearScreenshot();
         setFeedback(null);
+        setEditorHidden(false);
+        setAskPanelImage(null);
     }, 100);
   }, [clearScreenshot]);
+
+  const handleClose = useCallback(async () => {
+    // If AI panel is open, keep overlay visible for the panel and hide editor UI instead
+    if (showAskReact && (askPanelImage || currentScreenshot?.imageData)) {
+      setEditorHidden(true);
+      return;
+    }
+    await closeOverlayAndReset();
+  }, [askPanelImage, closeOverlayAndReset, currentScreenshot, showAskReact]);
 
   // Handle keyboard shortcuts
   useEffect(() => {
@@ -249,19 +262,22 @@ export function ScreenshotEditor() {
     (framework: AskFramework) => {
       setInitialAskFramework(framework);
       setAutoRunAsk(true);
+      setEditorHidden(false);
+      if (currentScreenshot?.imageData) {
+        setAskPanelImage(currentScreenshot.imageData);
+      }
       setShowAskReact(true);
     },
-    []
+    [currentScreenshot]
   );
 
 
 
-  if (!currentScreenshot) return null;
+  if (!currentScreenshot && !askPanelImage) return null;
 
-  // Calculate positions
-  const { x, y } = currentScreenshot.region;
-  // width/height from region might be stale if resized, using dimensions state is better
-  
+  // Calculate positions (guard for missing screenshot when panel is open)
+  const region = currentScreenshot?.region || { x: 0, y: 0, width: dimensions.width, height: dimensions.height };
+  const { x, y } = region;
   // Constants for toolbar spacing
   const TOOLBAR_HEIGHT = 60; 
   const TOOLBAR_WIDTH_EST = 850; // Increased to ensure full visibility
@@ -273,7 +289,7 @@ export function ScreenshotEditor() {
   
   // If not enough space above, try below
   if (toolbarTop < MARGIN) {
-    toolbarTop = y + dimensions.height + MARGIN;
+    toolbarTop = y + region.height + MARGIN;
     
     // If not enough space below (e.g. full height selection), put it inside at the top
     if (toolbarTop + TOOLBAR_HEIGHT > window.innerHeight - MARGIN) {
@@ -346,7 +362,7 @@ export function ScreenshotEditor() {
 
       {/* Annotation Toolbar - Only show if NOT pinned */}
       {/* Annotation Toolbar & Sidebar - Only show if NOT pinned */}
-      {!isPinned && (
+      {!isPinned && currentScreenshot && !editorHidden && (
         <>
           <div className="pointer-events-auto">
             <AnnotationToolbar
@@ -375,24 +391,6 @@ export function ScreenshotEditor() {
             />
           </div>
 
-          <div className="fixed right-6 top-28 z-40 flex flex-col gap-3 pointer-events-auto">
-            <div className="bg-white shadow-lg rounded-xl border border-gray-200 p-3">
-              <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold mb-2">AI Actions</p>
-              <button
-                onClick={() => {
-                  setInitialAskFramework('react');
-                  setAutoRunAsk(false);
-                  setShowAskReact(true);
-                }}
-                className="w-full px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-500 transition"
-              >
-                AI UI Code
-              </button>
-              <p className="text-[11px] text-gray-500 mt-2">
-                Send this snip for React/Vue/Flutter analysis and code JSON.
-              </p>
-            </div>
-          </div>
         </>
       )}
 
@@ -405,14 +403,18 @@ export function ScreenshotEditor() {
         </div>
       )}
 
-      {!isPinned && showAskReact && (
+      {showAskReact && (
         <AskReactPanel
-          screenshot={currentScreenshot.imageData}
+          screenshot={currentScreenshot?.imageData || askPanelImage || ''}
           initialFramework={initialAskFramework}
           autoRun={autoRunAsk}
           onClose={() => {
             setShowAskReact(false);
             setAutoRunAsk(false);
+            setAskPanelImage(null);
+            if (!currentScreenshot || editorHidden) {
+              void closeOverlayAndReset();
+            }
           }}
         />
       )}
