@@ -5,10 +5,16 @@ import type {
   AISummary,
   AICodeGeneration,
   TranslationResult,
+  AskFramework,
+  AskFrameworkCodeResult,
+  AskFrameworkPromptResult,
   AskReactCodeResult,
   AskReactPromptResult,
 } from '../types/index';
-import { buildAskReactAnalysisPrompt, buildAskReactCodePrompt } from '../utils/prompts/askReactPrompt';
+import {
+  buildAskFrameworkAnalysisPrompt,
+  buildAskFrameworkCodePrompt,
+} from '../utils/prompts/askReactPrompt';
 
 // TODO: Add OpenAI API key configuration
 const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY || '';
@@ -163,13 +169,14 @@ export async function explainScreenshot(imageBase64: string): Promise<string> {
 }
 
 /**
- * Ask React (Stage 1) - Generate a descriptive prompt from screenshot
+ * Ask (Stage 1) - Generate a descriptive prompt from screenshot for the chosen framework
  */
-export async function askReactGeneratePrompt(
+export async function askFrameworkGeneratePrompt(
   imageBase64: string,
+  framework: AskFramework,
   userPrompt?: string
-): Promise<AskReactPromptResult> {
-  const prompt = buildAskReactAnalysisPrompt(userPrompt);
+): Promise<AskFrameworkPromptResult> {
+  const prompt = buildAskFrameworkAnalysisPrompt(framework, userPrompt);
   const text = await callGeminiChat([
     {
       role: 'user',
@@ -181,20 +188,22 @@ export async function askReactGeneratePrompt(
   ]);
 
   return {
+    framework,
     prompt: text,
     reasoning: undefined,
   };
 }
 
 /**
- * Ask React (Stage 2) - Generate React component JSON from screenshot + prompt
+ * Ask (Stage 2) - Generate component/widget JSON from screenshot + prompt for the chosen framework
  */
-export async function askReactGenerateCode(
+export async function askFrameworkGenerateCode(
   imageBase64: string,
+  framework: AskFramework,
   preparedPrompt: string
-): Promise<AskReactCodeResult> {
-  const systemPrompt = buildAskReactCodePrompt();
-  const combinedPrompt = `${systemPrompt}\n\nPrepared prompt:\n${preparedPrompt}`;
+): Promise<AskFrameworkCodeResult> {
+  const systemPrompt = buildAskFrameworkCodePrompt(framework);
+  const combinedPrompt = `${systemPrompt}\n\nImage analysis:\n${preparedPrompt}`;
 
   const text = await callGeminiChat([
     {
@@ -206,13 +215,36 @@ export async function askReactGenerateCode(
     },
   ]);
 
-  const parsed = safeParseJson<AskReactCodeResult>(text);
+  const parsed = safeParseJson<AskFrameworkCodeResult>(text);
+  const defaultName: Record<AskFramework, string> = {
+    react: 'AskReactComponent',
+    vue: 'AskVueComponent',
+    flutter: 'AskFlutterWidget',
+  };
+  const defaultDescription: Record<AskFramework, string> = {
+    react: 'Generated React component',
+    vue: 'Generated Vue component',
+    flutter: 'Generated Flutter widget',
+  };
 
   return {
-    name: parsed.name || 'AskReactComponent',
-    description: parsed.description || 'Generated React component',
+    framework,
+    name: parsed.name || defaultName[framework],
+    description: parsed.description || defaultDescription[framework],
     code: parsed.code,
     props: parsed.props,
     styles: parsed.styles,
   };
 }
+
+// Backwards compatibility for existing Ask React callers
+export const askReactGeneratePrompt = (
+  imageBase64: string,
+  userPrompt?: string
+): Promise<AskReactPromptResult> => askFrameworkGeneratePrompt(imageBase64, 'react', userPrompt);
+
+export const askReactGenerateCode = (
+  imageBase64: string,
+  preparedPrompt: string
+): Promise<AskReactCodeResult> =>
+  askFrameworkGenerateCode(imageBase64, 'react', preparedPrompt);
