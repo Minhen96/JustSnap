@@ -37,8 +37,8 @@ function App() {
         await listen('screen-capture-ready', (e: any) => {
            try {
              if (typeof e.payload === 'string') {
-               // Faster path: Base64 string
-               setImgSrc(`data:image/png;base64,${e.payload}`);
+               // Faster path: Base64 string (now JPEG from backend)
+               setImgSrc(`data:image/jpeg;base64,${e.payload}`);
              } else {
                // Legacy path: byte array
                const bytes = new Uint8Array(e.payload);

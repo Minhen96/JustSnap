@@ -43,6 +43,12 @@ pub async fn capture_region(region: CaptureRegion) -> Result<Vec<u8>, String> {
 
 /// Capture the full screen (primary monitor)
 pub async fn capture_full_screen() -> Result<Vec<u8>, String> {
+    let rgba_image = capture_full_screen_raw().await?;
+    encode_as_png(&rgba_image)
+}
+
+/// Capture the full screen raw image (primary monitor)
+pub async fn capture_full_screen_raw() -> Result<RgbaImage, String> {
     let monitors = Monitor::all().map_err(|e| format!("Failed to get monitors: {}", e))?;
 
     let monitor = monitors
@@ -55,11 +61,8 @@ pub async fn capture_full_screen() -> Result<Vec<u8>, String> {
         .map_err(|e| format!("Failed to capture screen: {}", e))?;
 
     // Convert to RgbaImage
-    let rgba_image =
-        ImageBuffer::<Rgba<u8>, Vec<u8>>::from_raw(image.width(), image.height(), image.into_raw())
-            .ok_or_else(|| "Failed to create image buffer".to_string())?;
-
-    encode_as_png(&rgba_image)
+    ImageBuffer::<Rgba<u8>, Vec<u8>>::from_raw(image.width(), image.height(), image.into_raw())
+        .ok_or_else(|| "Failed to create image buffer".to_string())
 }
 
 /// Capture a specific monitor

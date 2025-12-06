@@ -2,6 +2,8 @@
 // Handles registering and listening for global keyboard shortcuts
 
 use base64::prelude::*;
+// use image::EncodableLayout; // Use simple bytes for now
+use std::io::Cursor;
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
@@ -43,87 +45,102 @@ pub fn register_global_hotkey(app: &AppHandle, hotkey: Hotkey) -> Result<(), Str
                 }
 
                 // Give the OS a moment to repaint the background
-                std::thread::sleep(std::time::Duration::from_millis(50));
+                std::thread::sleep(std::time::Duration::from_millis(10));
 
-                println!("Starting screen capture...");
+                println!("Starting screen capture (RAW)...");
+                // Captured raw image (fast)
                 let capture_result = tauri::async_runtime::block_on(async {
-                    crate::screen_capture::capture_full_screen().await
+                    crate::screen_capture::capture_full_screen_raw().await
                 });
 
                 match capture_result {
-                    Ok(image_data) => {
-                        println!("Screen captured successfully. Bytes: {}", image_data.len());
+                    Ok(raw_image) => {
+                        println!(
+                            "Screen captured (RAW). Size: {}x{}",
+                            raw_image.width(),
+                            raw_image.height()
+                        );
 
-                        // Emit a small debug event first to verify channel
-                        let _ =
-                            app_handle.emit("capture-debug", "Capture success! Sending data...");
+                        // 2. SHOW WINDOW IMMEDIATELY (Optimistic)
+                        if let Some(window) = app_handle.get_webview_window("main") {
+                            println!("Setting window to overlay mode (OPTIMISTIC)...");
 
-                        // Encode to Base64 to avoid slow JSON serialization of [u8] array
-                        let base64_image = BASE64_STANDARD.encode(&image_data);
+                            // Basic window setup
+                            let _ = window.set_decorations(false);
+                            let _ = window.set_always_on_top(true);
+                            let _ = window.set_skip_taskbar(true);
+                            let _ = window.set_shadow(false);
+                            let _ = window.set_resizable(true);
 
-                        // Emit the base64 string
-                        if let Err(e) = app_handle.emit("screen-capture-ready", base64_image) {
-                            eprintln!("Failed to emit screen capture event: {}", e);
-                        } else {
-                            println!("Screen capture event emitted!");
+                            // Robust reset: Manually set to monitor size
+                            if let Some(monitor) = window.current_monitor().ok().flatten() {
+                                let size = monitor.size();
+                                let scale_factor = monitor.scale_factor();
+                                let logical_width = size.width as f64 / scale_factor;
+                                let logical_height = size.height as f64 / scale_factor;
+
+                                let _ = window.set_position(tauri::LogicalPosition::new(0.0, 0.0));
+                                let _ = window.set_size(tauri::LogicalSize::new(
+                                    logical_width,
+                                    logical_height,
+                                ));
+                            }
+
+                            // Ensure window is visible and focused
+                            let _ = window.set_fullscreen(true);
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                            let _ = window.unminimize();
+                            let _ = window.set_ignore_cursor_events(false);
+
+                            // Trigger UI to show crosshair/overlay
+                            let _ = app_handle.emit("hotkey-triggered", ());
                         }
+
+                        // 3. ENCODE & SEND IMAGE (BACKGROUND)
+                        // Using JPEG for speed to minimize the "Jump" delay
+                        let app_handle_clone = app_handle.clone();
+                        tauri::async_runtime::spawn(async move {
+                            println!("Encoding image (JPEG) in background...");
+                            let mut buffer = Cursor::new(Vec::new());
+
+                            // Convert RGBA to RGB (JPEG doesn't support Alpha)
+                            // This is fast enough to do in background
+                            use image::buffer::ConvertBuffer;
+                            let rgb_image: image::RgbImage = raw_image.convert();
+
+                            // Use JPEG format with decent quality (80) for speed/quality balance
+                            let mut jpeg_encoder =
+                                image::codecs::jpeg::JpegEncoder::new_with_quality(&mut buffer, 80);
+
+                            if let Err(e) = jpeg_encoder.encode(
+                                &rgb_image, // Pass the converted RGB buffer
+                                rgb_image.width(),
+                                rgb_image.height(),
+                                image::ColorType::Rgb8.into(),
+                            ) {
+                                eprintln!("Failed to encode image: {}", e);
+                                return;
+                            }
+
+                            let image_data = buffer.into_inner();
+
+                            // Encode to Base64
+                            let base64_image = BASE64_STANDARD.encode(&image_data);
+
+                            println!("Image encoded. Sending to frontend...");
+                            if let Err(e) =
+                                app_handle_clone.emit("screen-capture-ready", base64_image)
+                            {
+                                eprintln!("Failed to emit screen capture event: {}", e);
+                            }
+                        });
                     }
                     Err(e) => {
                         eprintln!("Failed to capture screen: {}", e);
+                        // If capture failed, we should probably still show window or show error
                         let _ = app_handle.emit("capture-debug", format!("Capture failed: {}", e));
                     }
-                }
-
-                // 2. Get the main window and show it
-                if let Some(window) = app_handle.get_webview_window("main") {
-                    println!("Setting window to overlay mode...");
-
-                    // Basic window setup
-                    // We use an opaque window (transparent: false) but with no decorations
-                    let _ = window.set_decorations(false);
-                    let _ = window.set_always_on_top(true);
-                    let _ = window.set_skip_taskbar(true);
-                    let _ = window.set_shadow(false);
-                    let _ = window.set_resizable(true); // Ensure resizable so we can set size
-
-                    // Robust reset: Manually set to monitor size instead of just fullscreen
-                    // This fixes issues where previous "Stick" mode geometry persists
-                    if let Some(monitor) = window.current_monitor().ok().flatten() {
-                        let size = monitor.size();
-                        let scale_factor = monitor.scale_factor();
-                        let logical_width = size.width as f64 / scale_factor;
-                        let logical_height = size.height as f64 / scale_factor;
-
-                        let _ = window.set_position(tauri::LogicalPosition::new(0.0, 0.0));
-                        let _ =
-                            window.set_size(tauri::LogicalSize::new(logical_width, logical_height));
-                    }
-
-                    // Also set fullscreen as backup/enforcement
-                    if let Err(e) = window.set_fullscreen(true) {
-                        eprintln!("Failed to set fullscreen: {}", e);
-                        // Legacy fallback
-                        let _ = window.maximize();
-                    }
-
-                    // Ensure window is visible and focused
-                    let _ = window.show();
-                    let _ = window.set_focus();
-                    let _ = window.unminimize();
-
-                    // Enable mouse interaction
-                    let _ = window.set_ignore_cursor_events(false);
-
-                    println!(
-                        "Window setup complete. Visible: {:?}, Focused: {:?}",
-                        window.is_visible(),
-                        window.is_focused()
-                    );
-                }
-
-                // Emit event to frontend to trigger UI state change
-                if let Err(e) = app_handle.emit("hotkey-triggered", ()) {
-                    eprintln!("Failed to emit hotkey event: {}", e);
                 }
             }
         })
