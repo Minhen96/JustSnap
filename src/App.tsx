@@ -3,6 +3,8 @@ import { useEffect, useState, lazy, Suspense } from 'react';
 import { useAppStore } from './store/appStore';
 import { SnipOverlay } from './components/snipping/SnipOverlay';
 import { ErrorBoundary } from './components/ErrorBoundary';
+
+import SearchInput from './components/test';
 // Lazy load ScreenshotEditor to prevent initialization issues
 const ScreenshotEditor = lazy(() => import('./components/editor/ScreenshotEditor').then(module => ({ default: module.ScreenshotEditor })));
 
@@ -102,9 +104,47 @@ function App() {
               >
                 Test Overlay
               </button>
+
+              <div className="space-y-2 text-left">
+                <div className="flex items-center gap-2">
+                  <span className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm">
+                    ✓
+                  </span>
+                  <span>Screen Capture with Annotations</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm">
+                    ✓
+                  </span>
+                  <span>AI-Powered OCR & Translation</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm">
+                    ✓
+                  </span>
+                  <span>Screenshot to UI Code</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm">
+                    ✓
+                  </span>
+                  <span>Screen Recording & Live Snip</span>
+                </div>
+              </div>
             </div>
+
+            {/* Test component preview */}
+            <div className="bg-white rounded-lg shadow-md p-6 max-w-md">
+              <h3 className="text-lg font-semibold mb-3">Test: SearchInput component</h3>
+              <SearchInput />
+            </div>
+
+            <p className="text-sm text-gray-500">
+              Phase 1: Complete ✅ • Phase 2: In Progress 🚧
+            </p>
           </div>
         </div>
+      </div>
       )}
 
       {/* LAYER 4: SnipOverlay */}

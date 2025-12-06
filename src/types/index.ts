@@ -104,6 +104,19 @@ export interface AICodeGeneration {
   fileName: string;
 }
 
+export interface AskReactPromptResult {
+  prompt: string;
+  reasoning?: string;
+}
+
+export interface AskReactCodeResult {
+  name: string;
+  description: string;
+  code: string;
+  props?: Record<string, string>;
+  styles?: string;
+}
+
 // ============================================
 // Recording Types
 // ============================================

@@ -4,8 +4,10 @@ import { useAppStore } from '../../store/appStore';
 import { useAnnotation } from '../../hooks/useAnnotation';
 import { CanvasStage } from '../annotation/CanvasStage';
 import { AnnotationToolbar } from '../annotation/AnnotationToolbar';
+import { AskReactPanel } from '../ai/AskReactPanel';
 
 export function ScreenshotEditor() {
+  const [showAskReact, setShowAskReact] = useState(false);
   const currentScreenshot = useAppStore((state) => state.currentScreenshot);
   const clearScreenshot = useAppStore((state) => state.clearScreenshot);
 
@@ -266,6 +268,26 @@ export function ScreenshotEditor() {
           }}
         />
       </div>
+
+      {/* Sidebar actions */}
+      <div className="fixed right-6 top-28 z-40 flex flex-col gap-3">
+        <div className="bg-white shadow-lg rounded-xl border border-gray-200 p-3">
+          <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold mb-2">AI Actions</p>
+          <button
+            onClick={() => setShowAskReact(true)}
+            className="w-full px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-500 transition"
+          >
+            Ask React
+          </button>
+          <p className="text-[11px] text-gray-500 mt-2">
+            Send this snip to Ask React for prompt + code JSON.
+          </p>
+        </div>
+      </div>
+
+      {showAskReact && (
+        <AskReactPanel screenshot={currentScreenshot.imageData} onClose={() => setShowAskReact(false)} />
+      )}
     </div>
   );
 }
