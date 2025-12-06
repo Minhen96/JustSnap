@@ -4,7 +4,7 @@ import { useAppStore } from './store/appStore';
 import { SnipOverlay } from './components/snipping/SnipOverlay';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
-import SearchInput from './components/test';
+
 // Lazy load ScreenshotEditor to prevent initialization issues
 const ScreenshotEditor = lazy(() => import('./components/editor/ScreenshotEditor').then(module => ({ default: module.ScreenshotEditor })));
 
@@ -17,7 +17,7 @@ function App() {
   const currentScreenshot = useAppStore((state) => state.currentScreenshot);
   
   const [imgSrc, setImgSrc] = useState<string | null>(null);
-  const [hotkeyReady, setHotkeyReady] = useState(false);
+
 
   useEffect(() => {
     // Force CSS Reset to transparent
@@ -36,16 +36,22 @@ function App() {
 
         await listen('screen-capture-ready', (e: any) => {
            try {
-             const bytes = new Uint8Array(e.payload);
-             const blob = new Blob([bytes], { type: 'image/png' });
-             const url = URL.createObjectURL(blob);
-             setImgSrc(url);
+             if (typeof e.payload === 'string') {
+               // Faster path: Base64 string
+               setImgSrc(`data:image/png;base64,${e.payload}`);
+             } else {
+               // Legacy path: byte array
+               const bytes = new Uint8Array(e.payload);
+               const blob = new Blob([bytes], { type: 'image/png' });
+               const url = URL.createObjectURL(blob);
+               setImgSrc(url);
+             }
            } catch (err) {
-             console.error(`Blob Error: ${err}`);
+             console.error(`Blob/Image Error: ${err}`);
            }
         });
 
-        setHotkeyReady(true);
+
       } catch (e) {
         console.error("Error: " + e);
       }
@@ -90,61 +96,7 @@ function App() {
         </div>
       )}
 
-      {/* LAYER 3: Welcome Screen (if Inactive and No Screenshot) */}
-      {!isActive && !currentScreenshot && (
-        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 transition-colors duration-300">
-          <div className="text-center space-y-6 p-8">
-            <h1 className="text-6xl font-bold text-gray-800">JustSnap</h1>
-            <p className="text-xl text-gray-600">AI-Powered Snipping Tool</p>
-            <div className="bg-white rounded-lg shadow-md p-6 max-w-md mx-auto">
-               <p className="mb-4">Status: {hotkeyReady ? 'Ready' : 'Init...'}</p>
-               <button
-                onClick={() => useAppStore.getState().showOverlay('capture')}
-                className="w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-              >
-                Test Overlay
-              </button>
 
-              <div className="space-y-2 text-left">
-                <div className="flex items-center gap-2">
-                  <span className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm">
-                    ✓
-                  </span>
-                  <span>Screen Capture with Annotations</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm">
-                    ✓
-                  </span>
-                  <span>AI-Powered OCR & Translation</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm">
-                    ✓
-                  </span>
-                  <span>Screenshot to UI Code</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm">
-                    ✓
-                  </span>
-                  <span>Screen Recording & Live Snip</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Test component preview */}
-            <div className="bg-white rounded-lg shadow-md p-6 max-w-md">
-              <h3 className="text-lg font-semibold mb-3">Test: SearchInput component</h3>
-              <SearchInput />
-            </div>
-
-            <p className="text-sm text-gray-500">
-              Phase 1: Complete ✅ • Phase 2: In Progress 🚧
-            </p>
-          </div>
-        </div>
-      )}
 
       {/* LAYER 4: SnipOverlay */}
       {isActive && (
