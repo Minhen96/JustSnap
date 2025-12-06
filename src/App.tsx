@@ -18,14 +18,22 @@ function App() {
   
   const [imgSrc, setImgSrc] = useState<string | null>(null);
 
-  // Preload ScreenshotEditor in background to eliminate stutter
+  // Preload ScreenshotEditor and OCR worker in background
   useEffect(() => {
     // Wait a bit for initial app load, then preload
     const timer = setTimeout(() => {
+      // Preload Screenshot Editor
       import('./components/editor/ScreenshotEditor').catch(err => {
         console.warn('Failed to preload ScreenshotEditor:', err);
       });
-    }, 500); // Preload after 500ms
+
+      // Warm up OCR worker (downloads language files in background)
+      import('./services/ocr.service').then(({ warmupOCR }) => {
+        warmupOCR();
+      }).catch(err => {
+        console.warn('Failed to warm up OCR:', err);
+      });
+    }, 1000); // Preload after 1 second
 
     return () => clearTimeout(timer);
   }, []);

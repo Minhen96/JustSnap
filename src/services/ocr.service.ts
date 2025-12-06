@@ -6,34 +6,70 @@ import type { OCRResult, TextBlock } from '../types';
 
 // Singleton worker instance
 let worker: Worker | null = null;
+let isInitializing = false;
 
 /**
- * Initialize Tesseract.js worker (lazy loaded)
+ * Initialize Tesseract.js worker (lazy loaded or pre-warmed)
  */
 async function getWorker(): Promise<Worker> {
   if (worker) {
     return worker;
   }
 
+  // If already initializing, wait for it
+  if (isInitializing) {
+    console.log('[OCR] Worker already initializing, waiting...');
+    // Poll until worker is ready
+    while (!worker && isInitializing) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    if (worker) return worker;
+  }
+
+  isInitializing = true;
   console.log('[OCR] Initializing Tesseract.js worker...');
+  console.time('[OCR] Worker initialization');
+
   try {
     worker = await createWorker({
       logger: (m) => {
-        console.log('[OCR]', m);
+        // Only log important messages to reduce noise
+        if (m.status === 'loading tesseract core' ||
+            m.status === 'initializing tesseract' ||
+            m.status === 'loading language traineddata' ||
+            m.status === 'initializing api') {
+          console.log(`[OCR] ${m.status}... ${Math.round((m.progress || 0) * 100)}%`);
+        }
       },
     });
 
-    // Load languages - start with just English for reliability
+    console.log('[OCR] Loading English language data...');
     await worker.loadLanguage('eng');
+
+    console.log('[OCR] Initializing English...');
     await worker.initialize('eng');
 
-    console.log('[OCR] Worker initialized successfully');
+    console.timeEnd('[OCR] Worker initialization');
+    console.log('[OCR] ✅ Worker ready!');
+    isInitializing = false;
     return worker;
   } catch (error) {
-    console.error('[OCR] Failed to initialize worker:', error);
+    console.error('[OCR] ❌ Failed to initialize worker:', error);
     worker = null;
+    isInitializing = false;
     throw error;
   }
+}
+
+/**
+ * Warm up OCR worker in background (call on app start)
+ * This downloads language files ahead of time
+ */
+export function warmupOCR(): void {
+  console.log('[OCR] Starting warmup...');
+  getWorker().catch(err => {
+    console.warn('[OCR] Warmup failed (will retry on first use):', err);
+  });
 }
 
 /**
@@ -56,8 +92,8 @@ async function preprocessImage(
         return;
       }
 
-      // Set canvas size (upscale if too small for better accuracy)
-      const minWidth = 1000;
+      // Set canvas size (only upscale if very small)
+      const minWidth = 600;
       const scale = img.width < minWidth ? minWidth / img.width : 1;
       canvas.width = img.width * scale;
       canvas.height = img.height * scale;
@@ -119,7 +155,7 @@ function calculateConfidence(result: Awaited<ReturnType<Worker['recognize']>>): 
  * Extract text from image using Tesseract.js with auto-retry on low confidence
  *
  * Strategy:
- * 1. Try default preprocessing
+ * 1. Try direct image (no preprocessing) - FASTEST
  * 2. If confidence < 70%, retry with high contrast
  * 3. If still < 70%, retry with denoise
  * 4. Return best result
@@ -129,19 +165,21 @@ export async function extractText(
   onProgress?: (progress: number) => void
 ): Promise<OCRResult> {
   console.log('[OCR] Starting text extraction...');
+  console.log('[OCR] Image URL:', imageData.substring(0, 50) + '...');
 
   const tesseractWorker = await getWorker();
   let bestResult: OCRResult | null = null;
   let bestConfidence = 0;
 
-  // Attempt 1: Default preprocessing
-  console.log('[OCR] Attempt 1: Default preprocessing');
+  // Attempt 1: Direct image (no preprocessing) - FASTEST
+  console.log('[OCR] Attempt 1: Direct image (no preprocessing)');
   try {
-    const preprocessed = await preprocessImage(imageData, 'default');
-    const result = await tesseractWorker.recognize(preprocessed);
+    const startTime = Date.now();
+    const result = await tesseractWorker.recognize(imageData);
     const confidence = calculateConfidence(result);
+    const duration = Date.now() - startTime;
 
-    console.log(`[OCR] Attempt 1 confidence: ${confidence.toFixed(2)}%`);
+    console.log(`[OCR] Attempt 1 completed in ${duration}ms, confidence: ${confidence.toFixed(2)}%`);
 
     bestResult = {
       text: result.data.text,
@@ -155,77 +193,89 @@ export async function extractText(
     };
     bestConfidence = confidence;
 
-    onProgress?.(33);
+    onProgress?.(50);
 
-    // If good enough, return immediately
+    // If good enough, return immediately (skip preprocessing overhead)
     if (confidence >= 70) {
       console.log('[OCR] Good confidence, returning result');
       return bestResult;
     }
+
+    console.log('[OCR] Low confidence, will retry with preprocessing...');
   } catch (error) {
     console.error('[OCR] Attempt 1 failed:', error);
   }
 
-  // Attempt 2: High contrast preprocessing
-  console.log('[OCR] Attempt 2: High contrast preprocessing');
-  try {
-    const preprocessed = await preprocessImage(imageData, 'high_contrast');
-    const result = await tesseractWorker.recognize(preprocessed);
-    const confidence = calculateConfidence(result);
+  // Only retry with preprocessing if confidence was low
+  if (bestConfidence < 70) {
+    // Attempt 2: High contrast preprocessing
+    console.log('[OCR] Attempt 2: High contrast preprocessing');
+    try {
+      const startTime = Date.now();
+      const preprocessed = await preprocessImage(imageData, 'high_contrast');
+      const result = await tesseractWorker.recognize(preprocessed);
+      const confidence = calculateConfidence(result);
+      const duration = Date.now() - startTime;
 
-    console.log(`[OCR] Attempt 2 confidence: ${confidence.toFixed(2)}%`);
+      console.log(`[OCR] Attempt 2 completed in ${duration}ms, confidence: ${confidence.toFixed(2)}%`);
 
-    if (confidence > bestConfidence) {
-      bestResult = {
-        text: result.data.text,
-        confidence: confidence / 100,
-        language: 'eng',
-        blocks: result.data.lines.map((line): TextBlock => ({
-          text: line.text,
-          bbox: line.bbox,
-          confidence: line.confidence / 100,
-        })),
-      };
-      bestConfidence = confidence;
+      if (confidence > bestConfidence) {
+        bestResult = {
+          text: result.data.text,
+          confidence: confidence / 100,
+          language: 'eng',
+          blocks: result.data.lines.map((line): TextBlock => ({
+            text: line.text,
+            bbox: line.bbox,
+            confidence: line.confidence / 100,
+          })),
+        };
+        bestConfidence = confidence;
+      }
+
+      onProgress?.(75);
+
+      // If good enough, return
+      if (confidence >= 70) {
+        console.log('[OCR] Good confidence after retry, returning result');
+        return bestResult!;
+      }
+    } catch (error) {
+      console.error('[OCR] Attempt 2 failed:', error);
     }
 
-    onProgress?.(66);
+    // Attempt 3: Denoise preprocessing (last resort)
+    console.log('[OCR] Attempt 3: Denoise preprocessing');
+    try {
+      const startTime = Date.now();
+      const preprocessed = await preprocessImage(imageData, 'denoise');
+      const result = await tesseractWorker.recognize(preprocessed);
+      const confidence = calculateConfidence(result);
+      const duration = Date.now() - startTime;
 
-    // If good enough, return
-    if (confidence >= 70) {
-      console.log('[OCR] Good confidence after retry, returning result');
-      return bestResult!;
+      console.log(`[OCR] Attempt 3 completed in ${duration}ms, confidence: ${confidence.toFixed(2)}%`);
+
+      if (confidence > bestConfidence) {
+        bestResult = {
+          text: result.data.text,
+          confidence: confidence / 100,
+          language: 'eng',
+          blocks: result.data.lines.map((line): TextBlock => ({
+            text: line.text,
+            bbox: line.bbox,
+            confidence: line.confidence / 100,
+          })),
+        };
+        bestConfidence = confidence;
+      }
+
+      onProgress?.(100);
+    } catch (error) {
+      console.error('[OCR] Attempt 3 failed:', error);
     }
-  } catch (error) {
-    console.error('[OCR] Attempt 2 failed:', error);
-  }
-
-  // Attempt 3: Denoise preprocessing
-  console.log('[OCR] Attempt 3: Denoise preprocessing');
-  try {
-    const preprocessed = await preprocessImage(imageData, 'denoise');
-    const result = await tesseractWorker.recognize(preprocessed);
-    const confidence = calculateConfidence(result);
-
-    console.log(`[OCR] Attempt 3 confidence: ${confidence.toFixed(2)}%`);
-
-    if (confidence > bestConfidence) {
-      bestResult = {
-        text: result.data.text,
-        confidence: confidence / 100,
-        language: 'eng',
-        blocks: result.data.lines.map((line): TextBlock => ({
-          text: line.text,
-          bbox: line.bbox,
-          confidence: line.confidence / 100,
-        })),
-      };
-      bestConfidence = confidence;
-    }
-
+  } else {
+    // Good confidence on first try, skip preprocessing
     onProgress?.(100);
-  } catch (error) {
-    console.error('[OCR] Attempt 3 failed:', error);
   }
 
   if (!bestResult) {
