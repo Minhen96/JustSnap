@@ -1,9 +1,10 @@
 // JustSnap - Ask React Panel
-// Dedicated flow: generate prompt from snip -> generate React code JSON -> download/copy
+// Dedicated flow: generate prompt from snip -> generate framework-specific code JSON -> download/copy
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAskReact } from '../../hooks/useAskReact';
 import { exportText, generateFileName } from '../../utils/file';
+import type { AskFramework } from '../../types';
 
 interface AskReactPanelProps {
   screenshot: string; // base64 or object URL
@@ -11,6 +12,7 @@ interface AskReactPanelProps {
 }
 
 export function AskReactPanel({ screenshot, onClose }: AskReactPanelProps) {
+  const [framework, setFramework] = useState<AskFramework>('react');
   const [userPrompt, setUserPrompt] = useState('');
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
 
@@ -22,7 +24,22 @@ export function AskReactPanel({ screenshot, onClose }: AskReactPanelProps) {
     error,
     generatePrompt,
     generateCode,
-  } = useAskReact(screenshot);
+  } = useAskReact(screenshot, framework);
+
+  useEffect(() => {
+    setCopyState('idle');
+  }, [framework]);
+
+  const frameworkLabels: Record<AskFramework, string> = {
+    react: 'React',
+    vue: 'Vue',
+    flutter: 'Flutter',
+  };
+  const frameworkOptions: Array<{ value: AskFramework; label: string; hint: string }> = [
+    { value: 'react', label: 'React', hint: 'TSX + Tailwind' },
+    { value: 'vue', label: 'Vue', hint: 'Vue 3 SFC' },
+    { value: 'flutter', label: 'Flutter', hint: 'Dart widget' },
+  ];
 
   const handleGeneratePrompt = async () => {
     setCopyState('idle');
@@ -48,7 +65,7 @@ export function AskReactPanel({ screenshot, onClose }: AskReactPanelProps) {
 
   const handleDownload = () => {
     if (!codeResult) return;
-    const fileName = generateFileName('ask-react');
+    const fileName = generateFileName(`ask-${framework}`);
     const propsText = codeResult.props
       ? Object.entries(codeResult.props)
           .map(([key, val]) => `- ${key}: ${val}`)
@@ -56,11 +73,13 @@ export function AskReactPanel({ screenshot, onClose }: AskReactPanelProps) {
       : 'None';
 
     const fileContent = [
-      `Ask React Result: ${codeResult.name}`,
+      `Ask ${frameworkLabels[framework]} Result: ${codeResult.name}`,
       '',
       `Description: ${codeResult.description}`,
       '',
-      `Prompt Used: ${generatedPrompt?.prompt || 'N/A'}`,
+      `Framework: ${frameworkLabels[framework]}`,
+      '',
+      `Image analysis used: ${generatedPrompt?.prompt || 'N/A'}`,
       '',
       'Props:',
       propsText,
@@ -79,8 +98,9 @@ export function AskReactPanel({ screenshot, onClose }: AskReactPanelProps) {
     <div className="fixed right-4 top-20 w-[440px] max-h-[80vh] bg-white rounded-xl shadow-2xl border border-gray-100 z-50 flex flex-col pointer-events-auto">
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
         <div>
-          <p className="text-xs uppercase tracking-wide text-blue-600 font-semibold">Ask React</p>
-          <h3 className="text-lg font-semibold text-gray-900">Generate React from this snip</h3>
+          <p className="text-xs uppercase tracking-wide text-blue-600 font-semibold">Ask AI</p>
+          <h3 className="text-lg font-semibold text-gray-900">Generate UI code from this snip</h3>
+          <p className="text-sm text-gray-600">Pick React, Vue, or Flutter and run analysis + code generation.</p>
         </div>
         <button
           onClick={onClose}
@@ -103,15 +123,34 @@ export function AskReactPanel({ screenshot, onClose }: AskReactPanelProps) {
           </div>
         </div>
 
-        {/* User prompt input */}
-        <div>
-          <label className="block text-sm font-medium text-gray-800 mb-2">Optional guidance</label>
-          <textarea
-            value={userPrompt}
-            onChange={(e) => setUserPrompt(e.target.value)}
-            placeholder="Tell Ask React what you want (e.g., “create reusable card with CTA”)"
-            className="w-full min-h-[80px] p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-          />
+        {/* Framework selector + optional guidance */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-800 mb-2">Target framework</label>
+            <div className="relative">
+              <select
+                value={framework}
+                onChange={(e) => setFramework(e.target.value as AskFramework)}
+                className="w-full appearance-none rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {frameworkOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label} - {option.hint}
+                  </option>
+                ))}
+              </select>
+              <span className="pointer-events-none absolute right-3 top-2.5 text-gray-500 text-xs">v</span>
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-800 mb-2">Optional guidance</label>
+            <textarea
+              value={userPrompt}
+              onChange={(e) => setUserPrompt(e.target.value)}
+              placeholder="Add notes (e.g., make the card reusable with CTA)"
+              className="w-full min-h-[80px] p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+            />
+          </div>
         </div>
 
         {/* Actions */}
@@ -121,14 +160,14 @@ export function AskReactPanel({ screenshot, onClose }: AskReactPanelProps) {
             disabled={isPromptLoading}
             className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium disabled:opacity-60"
           >
-            {isPromptLoading ? 'Generating prompt...' : 'Generate prompt'}
+            {isPromptLoading ? 'Analyzing...' : 'Analyze snip'}
           </button>
           <button
             onClick={handleGenerateCode}
             disabled={!generatedPrompt || isCodeLoading}
             className="px-4 py-2 rounded-lg bg-gray-900 text-white text-sm font-medium disabled:opacity-60"
           >
-            {isCodeLoading ? 'Generating code...' : 'Generate React code'}
+            {isCodeLoading ? 'Generating code...' : `Generate ${frameworkLabels[framework]} code`}
           </button>
         </div>
 
@@ -136,10 +175,10 @@ export function AskReactPanel({ screenshot, onClose }: AskReactPanelProps) {
         <div className="grid grid-cols-2 gap-3 text-sm">
           <div className="border border-gray-200 rounded-lg p-3">
             <p className="text-xs text-gray-500 mb-1">Step 1</p>
-            <p className="font-semibold text-gray-800">Prompt</p>
+            <p className="font-semibold text-gray-800">Image analysis</p>
             <p className="text-gray-600 text-sm mt-1">
               {generatedPrompt
-                ? 'Prompt ready'
+                ? 'Analysis ready'
                 : isPromptLoading
                 ? 'Analyzing snip...'
                 : 'Awaiting generation'}
@@ -147,7 +186,7 @@ export function AskReactPanel({ screenshot, onClose }: AskReactPanelProps) {
           </div>
           <div className="border border-gray-200 rounded-lg p-3">
             <p className="text-xs text-gray-500 mb-1">Step 2</p>
-            <p className="font-semibold text-gray-800">React Code JSON</p>
+            <p className="font-semibold text-gray-800">{frameworkLabels[framework]} code JSON</p>
             <p className="text-gray-600 text-sm mt-1">
               {codeResult
                 ? 'Code ready'
@@ -161,7 +200,7 @@ export function AskReactPanel({ screenshot, onClose }: AskReactPanelProps) {
         {/* Output */}
         {generatedPrompt && (
           <div className="border border-blue-100 bg-blue-50 rounded-lg p-3">
-            <p className="text-xs uppercase tracking-wide text-blue-700 font-semibold mb-1">Generated prompt</p>
+            <p className="text-xs uppercase tracking-wide text-blue-700 font-semibold mb-1">Generated analysis</p>
             <p className="text-sm text-blue-900 whitespace-pre-wrap">{generatedPrompt.prompt}</p>
           </div>
         )}
@@ -170,7 +209,9 @@ export function AskReactPanel({ screenshot, onClose }: AskReactPanelProps) {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Component</p>
+                <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">
+                  {frameworkLabels[framework]} result
+                </p>
                 <h4 className="text-base font-semibold text-gray-900">{codeResult.name}</h4>
                 <p className="text-sm text-gray-600">{codeResult.description}</p>
               </div>

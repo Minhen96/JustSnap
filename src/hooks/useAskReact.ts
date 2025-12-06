@@ -1,24 +1,28 @@
-// JustSnap - Ask React flow hook
+// JustSnap - Ask UI flow hook (React/Vue/Flutter)
 // Handles two-stage LLM interaction: prompt generation + code JSON generation
 
-import { useEffect, useState } from 'react';
-import { askReactGenerateCode, askReactGeneratePrompt } from '../services/ai.service';
+import { useCallback, useEffect, useState } from 'react';
+import { askFrameworkGenerateCode, askFrameworkGeneratePrompt } from '../services/ai.service';
 import { imageUrlToBase64 } from '../utils/image';
-import type { AskReactCodeResult, AskReactPromptResult } from '../types';
+import type { AskFramework, AskFrameworkCodeResult, AskFrameworkPromptResult } from '../types';
 
-export function useAskReact(screenshotUrl: string) {
-  const [generatedPrompt, setGeneratedPrompt] = useState<AskReactPromptResult | null>(null);
-  const [codeResult, setCodeResult] = useState<AskReactCodeResult | null>(null);
+export function useAskReact(screenshotUrl: string, framework: AskFramework) {
+  const [generatedPrompt, setGeneratedPrompt] = useState<AskFrameworkPromptResult | null>(null);
+  const [codeResult, setCodeResult] = useState<AskFrameworkCodeResult | null>(null);
   const [isPromptLoading, setIsPromptLoading] = useState(false);
   const [isCodeLoading, setIsCodeLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Reset when screenshot changes
-  useEffect(() => {
+  const reset = useCallback(() => {
     setGeneratedPrompt(null);
     setCodeResult(null);
     setError(null);
-  }, [screenshotUrl]);
+  }, []);
+
+  // Reset when screenshot changes
+  useEffect(() => {
+    reset();
+  }, [screenshotUrl, framework, reset]);
 
   const generatePrompt = async (userPrompt?: string) => {
     setError(null);
@@ -27,11 +31,11 @@ export function useAskReact(screenshotUrl: string) {
 
     try {
       const base64 = await imageUrlToBase64(screenshotUrl);
-      const result = await askReactGeneratePrompt(base64, userPrompt);
+      const result = await askFrameworkGeneratePrompt(base64, framework, userPrompt);
       setGeneratedPrompt(result);
       return result;
     } catch (err) {
-      console.error('Ask React prompt generation failed:', err);
+      console.error('Ask UI prompt generation failed:', err);
       const message = err instanceof Error ? err.message : 'Unable to generate prompt. Please try again.';
       setError(message);
       return null;
@@ -46,23 +50,17 @@ export function useAskReact(screenshotUrl: string) {
 
     try {
       const base64 = await imageUrlToBase64(screenshotUrl);
-      const result = await askReactGenerateCode(base64, preparedPrompt);
+      const result = await askFrameworkGenerateCode(base64, framework, preparedPrompt);
       setCodeResult(result);
       return result;
     } catch (err) {
-      console.error('Ask React code generation failed:', err);
+      console.error('Ask UI code generation failed:', err);
       const message = err instanceof Error ? err.message : 'Unable to generate code. Please try again.';
       setError(message);
       return null;
     } finally {
       setIsCodeLoading(false);
     }
-  };
-
-  const reset = () => {
-    setGeneratedPrompt(null);
-    setCodeResult(null);
-    setError(null);
   };
 
   return {
