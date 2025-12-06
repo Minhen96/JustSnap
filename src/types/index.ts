@@ -104,18 +104,26 @@ export interface AICodeGeneration {
   fileName: string;
 }
 
-export interface AskReactPromptResult {
-  prompt: string;
+export type AskFramework = 'react' | 'vue' | 'flutter';
+
+export interface AskFrameworkPromptResult {
+  framework: AskFramework;
+  prompt: string; // LLM's descriptive analysis of the image to feed into code generation
   reasoning?: string;
 }
 
-export interface AskReactCodeResult {
+export interface AskFrameworkCodeResult {
+  framework: AskFramework;
   name: string;
   description: string;
   code: string;
   props?: Record<string, string>;
   styles?: string;
 }
+
+// Backwards compatibility for earlier Ask React-only naming
+export type AskReactPromptResult = AskFrameworkPromptResult;
+export type AskReactCodeResult = AskFrameworkCodeResult;
 
 // ============================================
 // Recording Types
