@@ -152,7 +152,7 @@ export function AnnotationToolbar({
                 {strokeWidth}px
               </button>
 
-              <div className="absolute top-full mt-1 left-0 bg-white rounded-lg shadow-xl border border-gray-200 p-3 hidden group-hover:block w-40">
+              <div className="absolute top-full mt-1 left-0 bg-white rounded-lg shadow-xl border border-gray-200 p-3 w-40 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 group-hover:delay-0 delay-300">
                 <input
                   type="range"
                   min="1"
