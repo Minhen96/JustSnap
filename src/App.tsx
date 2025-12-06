@@ -18,6 +18,18 @@ function App() {
   
   const [imgSrc, setImgSrc] = useState<string | null>(null);
 
+  // Preload ScreenshotEditor in background to eliminate stutter
+  useEffect(() => {
+    // Wait a bit for initial app load, then preload
+    const timer = setTimeout(() => {
+      import('./components/editor/ScreenshotEditor').catch(err => {
+        console.warn('Failed to preload ScreenshotEditor:', err);
+      });
+    }, 500); // Preload after 500ms
+
+    return () => clearTimeout(timer);
+  }, []);
+
 
   useEffect(() => {
     // Force CSS Reset to transparent
@@ -99,7 +111,7 @@ function App() {
 
 
       {/* LAYER 4: SnipOverlay */}
-      {isActive && (
+      {isActive && !currentScreenshot && (
         <div className="absolute inset-0 z-30">
           <ErrorBoundary>
             <SnipOverlay />
@@ -108,7 +120,7 @@ function App() {
       )}
       
       {/* LAYER 5: Screenshot Editor */}
-      {currentScreenshot && !isActive && (
+      {currentScreenshot && (
         <div className="absolute inset-0 z-40">
           <ErrorBoundary>
             <Suspense fallback={null}>

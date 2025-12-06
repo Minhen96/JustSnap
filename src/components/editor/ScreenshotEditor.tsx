@@ -296,7 +296,7 @@ export function ScreenshotEditor() {
 
       {/* Main Canvas Area */}
       <div
-        className={`absolute overflow-hidden bg-white pointer-events-auto ${isPinned ? 'cursor-move' : 'shadow-2xl border border-gray-200'}`}
+        className={`absolute overflow-hidden bg-transparent pointer-events-auto ${isPinned ? 'cursor-move' : 'shadow-2xl border border-gray-200'}`}
         style={{ 
           left: isPinned ? 0 : x,
           top: isPinned ? 0 : y,
