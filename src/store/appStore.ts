@@ -2,7 +2,7 @@
 // Manages app-wide state for overlay, capture mode, screenshots
 
 import { create } from 'zustand';
-import { shallow } from 'zustand/shallow';
+import { useShallow } from 'zustand/react/shallow';
 import type { CaptureMode, Region, Screenshot, AnnotationTool, Annotation, AnnotationStyle, OCRResult, TranslationResult } from '../types';
 
 interface AppState {
@@ -308,44 +308,41 @@ export const useAppStore = create<AppState>((set) => ({
 // Selectors for common state combinations
 export const useOverlayState = () =>
   useAppStore(
-    (state) => ({
+    useShallow((state) => ({
       isActive: state.isOverlayActive,
       mode: state.currentMode,
       show: state.showOverlay,
       hide: state.hideOverlay,
       setMode: state.setMode,
-    }),
-    shallow
+    }))
   );
 
 export const useSelectionState = () =>
   useAppStore(
-    (state) => ({
+    useShallow((state) => ({
       region: state.selectedRegion,
       isSelecting: state.isSelecting,
       start: state.startSelection,
       update: state.updateSelection,
       finish: state.finishSelection,
       cancel: state.cancelSelection,
-    }),
-    shallow
+    }))
   );
 
 export const useScreenshotState = () =>
   useAppStore(
-    (state) => ({
+    useShallow((state) => ({
       current: state.currentScreenshot,
       history: state.screenshots,
       set: state.setScreenshot,
       clear: state.clearScreenshot,
       addToHistory: state.addToHistory,
-    }),
-    shallow
+    }))
   );
 
 export const useAnnotationState = () =>
   useAppStore(
-    (state) => ({
+    useShallow((state) => ({
       tool: state.currentTool,
       annotations: state.annotations,
       style: state.annotationStyle,
@@ -359,6 +356,5 @@ export const useAnnotationState = () =>
       updateStyle: state.updateAnnotationStyle,
       undo: state.undoAnnotation,
       redo: state.redoAnnotation,
-    }),
-    shallow
+    }))
   );

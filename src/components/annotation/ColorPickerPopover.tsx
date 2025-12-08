@@ -2,6 +2,7 @@
 // Professional color picker with presets, recent colors, and custom picker
 
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Check } from 'lucide-react';
 
 interface ColorPickerPopoverProps {
@@ -126,96 +127,98 @@ export function ColorPickerPopover({
 
   if (!isOpen) return null;
 
-  return (
-    <div
-      ref={popoverRef}
-      className="fixed z-[99999] bg-white rounded-lg shadow-2xl border border-gray-200 p-2"
-      style={{
-        top: `${position.top}px`,
-        left: `${position.left}px`,
-        minWidth: '200px',
-      }}
-    >
-      {/* Main Row: 4 Preset Colors + Color Picker Button */}
-      <div className="flex items-center gap-1 mb-2">
-        {PRESET_COLORS.map((color) => (
-          <button
-            key={color}
-            onClick={() => handleColorSelect(color)}
-            className="relative w-8 h-8 rounded-md border-2 hover:scale-110 transition-transform flex-shrink-0"
-            style={{
-              backgroundColor: color,
-              borderColor: currentColor === color ? '#3B82F6' : '#E5E7EB',
-            }}
-            title={color}
-          >
-            {currentColor === color && (
-              <Check
-                size={14}
-                className="absolute inset-0 m-auto"
-                style={{ color: color === '#FFFFFF' || color === '#00FF00' ? '#000000' : '#FFFFFF' }}
-              />
-            )}
-          </button>
-        ))}
-        
-        {/* Custom Color Picker Button - Triggers native color picker */}
-        <button
-          onClick={() => colorInputRef.current?.click()}
-          className="w-8 h-8 rounded-md border-2 border-gray-300 hover:border-blue-500 hover:scale-110 transition-all flex items-center justify-center bg-gradient-to-br from-red-500 via-yellow-500 to-blue-500 flex-shrink-0"
-          title="Custom Color"
-        >
-          <div className="w-6 h-6 bg-white rounded-sm flex items-center justify-center text-xs font-bold text-gray-700">
-            +
-          </div>
-        </button>
-        
-        {/* Hidden native color input */}
-        <input
-          ref={colorInputRef}
-          type="color"
-          value={customColor}
-          onChange={(e) => {
-            setCustomColor(e.target.value);
-            handleColorSelect(e.target.value);
-          }}
-          className="hidden"
-        />
-      </div>
-
-      {/* Recent Colors */}
-      {recentColors.length > 0 && (
-        <div>
-          <div className="text-[10px] font-semibold text-gray-500 mb-1 px-1">RECENT</div>
-          <div className="flex gap-1">
-            {recentColors.map((color, index) => (
-              <button
-                key={`${color}-${index}`}
-                onClick={() => handleColorSelect(color)}
-                className="relative w-6 h-6 rounded-md border-2 hover:scale-110 transition-transform"
-                style={{
-                  backgroundColor: color,
-                  borderColor: currentColor === color ? '#3B82F6' : '#E5E7EB',
-                }}
-                title={color}
-              >
-                {currentColor === color && (
-                  <Check
-                    size={12}
-                    className="absolute inset-0 m-auto"
-                    style={{ color: color === '#FFFFFF' ? '#000000' : '#FFFFFF' }}
-                  />
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Arrow pointing to button */}
+  // Use Portal to escape parent transforms (which break fixed positioning)
+  return createPortal(
       <div
-        className="absolute bottom-[-6px] left-1/2 -translate-x-1/2 w-3 h-3 bg-white border-r border-b border-gray-200 rotate-45"
-      />
-    </div>
-  );
-}
+        ref={popoverRef}
+        className="fixed z-[99999] bg-white rounded-lg shadow-2xl border border-gray-200 p-2"
+        style={{
+          top: `${position.top}px`,
+          left: `${position.left}px`,
+          minWidth: '200px',
+        }}
+      >
+        {/* Main Row: 4 Preset Colors + Color Picker Button */}
+        <div className="flex items-center gap-1 mb-2">
+          {PRESET_COLORS.map((color) => (
+            <button
+              key={color}
+              onClick={() => handleColorSelect(color)}
+              className="relative w-8 h-8 rounded-md border-2 hover:scale-110 transition-transform flex-shrink-0"
+              style={{
+                backgroundColor: color,
+                borderColor: currentColor === color ? '#3B82F6' : '#E5E7EB',
+              }}
+              title={color}
+            >
+              {currentColor === color && (
+                <Check
+                  size={14}
+                  className="absolute inset-0 m-auto"
+                  style={{ color: color === '#FFFFFF' || color === '#00FF00' ? '#000000' : '#FFFFFF' }}
+                />
+              )}
+            </button>
+          ))}
+          
+          {/* Custom Color Picker Button - Triggers native color picker */}
+          <button
+            onClick={() => colorInputRef.current?.click()}
+            className="w-8 h-8 rounded-md border-2 border-gray-300 hover:border-blue-500 hover:scale-110 transition-all flex items-center justify-center bg-gradient-to-br from-red-500 via-yellow-500 to-blue-500 flex-shrink-0"
+            title="Custom Color"
+          >
+            <div className="w-6 h-6 bg-white rounded-sm flex items-center justify-center text-xs font-bold text-gray-700">
+              +
+            </div>
+          </button>
+          
+          {/* Hidden native color input */}
+          <input
+            ref={colorInputRef}
+            type="color"
+            value={customColor}
+            onChange={(e) => {
+              setCustomColor(e.target.value);
+              handleColorSelect(e.target.value);
+            }}
+            className="hidden"
+          />
+        </div>
+
+        {/* Recent Colors */}
+        {recentColors.length > 0 && (
+          <div>
+            <div className="text-[10px] font-semibold text-gray-500 mb-1 px-1">RECENT</div>
+            <div className="flex gap-1">
+              {recentColors.map((color, index) => (
+                <button
+                  key={`${color}-${index}`}
+                  onClick={() => handleColorSelect(color)}
+                  className="relative w-6 h-6 rounded-md border-2 hover:scale-110 transition-transform"
+                  style={{
+                    backgroundColor: color,
+                    borderColor: currentColor === color ? '#3B82F6' : '#E5E7EB',
+                  }}
+                  title={color}
+                >
+                  {currentColor === color && (
+                    <Check
+                      size={12}
+                      className="absolute inset-0 m-auto"
+                      style={{ color: color === '#FFFFFF' ? '#000000' : '#FFFFFF' }}
+                    />
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Arrow pointing to button */}
+        <div
+          className="absolute bottom-[-6px] left-1/2 -translate-x-1/2 w-3 h-3 bg-white border-r border-b border-gray-200 rotate-45"
+        />
+      </div>,
+      document.body
+    );
+  }

@@ -186,135 +186,6 @@ pub async fn copy_text_to_clipboard(text: String) -> Result<(), String> {
     Ok(())
 }
 
-// ============================================
-// Window Detection Commands
-// ============================================
-
-#[derive(serde::Serialize)]
-pub struct WindowInfo {
-    pub title: String,
-    pub x: i32,
-    pub y: i32,
-    pub width: i32,
-    pub height: i32,
-}
-
-#[command]
-pub async fn get_window_at_position(x: i32, y: i32) -> Result<Option<WindowInfo>, String> {
-    // TODO: Detect window at mouse position
-    println!("Getting window at: {}, {}", x, y);
-    Ok(None)
-}
-
-#[command]
-pub async fn get_all_windows() -> Result<Vec<WindowInfo>, String> {
-    // TODO: Get all open windows
-    println!("Getting all windows");
-    Ok(vec![])
-}
-
-// ============================================
-// Monitor Commands
-// ============================================
-// MonitorInfo is now defined in screen_capture.rs
-
-#[command]
-pub async fn get_all_monitors() -> Result<Vec<crate::screen_capture::MonitorInfo>, String> {
-    use crate::screen_capture::get_all_monitors;
-
-    get_all_monitors()
-}
-
-// ============================================
-// Settings Commands
-// ============================================
-
-#[command]
-pub async fn get_settings() -> Result<serde_json::Value, String> {
-    // TODO: Load settings from file
-    println!("Getting settings");
-    Ok(serde_json::json!({}))
-}
-
-#[command]
-pub async fn save_settings(settings: serde_json::Value) -> Result<(), String> {
-    // TODO: Save settings to file
-    println!("Saving settings: {:?}", settings);
-    Ok(())
-}
-
-// ============================================
-// System Tray Commands (Future)
-// ============================================
-
-#[command]
-pub async fn stick_window(
-    app: tauri::AppHandle,
-    x: f64,
-    y: f64,
-    width: f64,
-    height: f64,
-) -> Result<(), String> {
-    use tauri::{LogicalPosition, LogicalSize, Manager};
-
-    if let Some(window) = app.get_webview_window("main") {
-        let _ = window.unmaximize();
-        let _ = window.set_fullscreen(false);
-        // Enable decorations so user can move/resize natively
-        let _ = window.set_decorations(true);
-        let _ = window.set_resizable(true);
-        let _ = window.set_shadow(true); // Add shadow back for visibility
-
-        // Critical: Set size THEN position
-        let _ = window.set_size(LogicalSize::new(width, height));
-        let _ = window.set_position(LogicalPosition::new(x, y));
-
-        let _ = window.set_always_on_top(true);
-        let _ = window.set_ignore_cursor_events(false);
-    }
-    Ok(())
-}
-
-#[command]
-pub async fn restore_window(app: tauri::AppHandle) -> Result<(), String> {
-    use tauri::{LogicalPosition, Manager};
-
-    // Logic to restore to "Fullscreen Overlay" mode
-    if let Some(window) = app.get_webview_window("main") {
-        if let Some(monitor) = window.current_monitor().ok().flatten() {
-            let size = monitor.size();
-            let scale_factor = monitor.scale_factor();
-            let logical_width = size.width as f64 / scale_factor;
-            let logical_height = size.height as f64 / scale_factor;
-
-            // Disable decorations for overlay
-            let _ = window.set_decorations(false);
-            let _ = window.set_shadow(false);
-
-            let _ = window.set_position(LogicalPosition::new(0.0, 0.0));
-            // Explicitly setting size is often more reliable than set_fullscreen for overlays that need to be transparent/clickable
-            let _ = window.set_size(tauri::LogicalSize::new(logical_width, logical_height));
-            let _ = window.set_resizable(true); // Keep resizable for future
-            let _ = window.set_always_on_top(true);
-        }
-    }
-    Ok(())
-}
-
-#[command]
-pub async fn show_in_tray() -> Result<(), String> {
-    // TODO: Show app in system tray
-    println!("Showing in tray");
-    Ok(())
-}
-
-#[command]
-pub async fn hide_from_tray() -> Result<(), String> {
-    // TODO: Hide from system tray
-    println!("Hiding from tray");
-    Ok(())
-}
-
 #[command]
 pub async fn save_temp_image(image_data: Vec<u8>) -> Result<String, String> {
     use std::io::Write;
@@ -348,7 +219,7 @@ pub async fn create_sticky_window(
     // Inject src directly
     let init_script = format!("window.__STICKY_IMAGE_SRC__ = {:?};", image_src);
 
-    let win = WebviewWindowBuilder::new(&app, &label, WebviewUrl::App("index.html".into()))
+    let _win = WebviewWindowBuilder::new(&app, &label, WebviewUrl::App("index.html".into()))
         .title("JustSnap Sticky")
         .decorations(true)
         .resizable(true)
@@ -420,23 +291,19 @@ pub async fn create_translation_window(
     let width = 400.0;
     let height = 600.0;
 
-    let _ = WebviewWindowBuilder::new(
-        &app,
-        &label,
-        WebviewUrl::App("index.html".into()),
-    )
-    .title("JustSnap Translate")
-    .decorations(false) // Frameless
-    .resizable(true)
-    .always_on_top(false)
-    .skip_taskbar(false)
-    .transparent(false)
-    .shadow(true)
-    .inner_size(width, height)
-    .position(x, y)
-    .initialization_script(&init_script)
-    .build()
-    .map_err(|e| e.to_string())?;
+    let _ = WebviewWindowBuilder::new(&app, &label, WebviewUrl::App("index.html".into()))
+        .title("JustSnap Translate")
+        .decorations(false) // Frameless
+        .resizable(true)
+        .always_on_top(false)
+        .skip_taskbar(false)
+        .transparent(false)
+        .shadow(true)
+        .inner_size(width, height)
+        .position(x, y)
+        .initialization_script(&init_script)
+        .build()
+        .map_err(|e| e.to_string())?;
 
     Ok(())
 }

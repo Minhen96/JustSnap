@@ -15,6 +15,7 @@ export function RegionSelector({ onDragStart }: RegionSelectorProps = {}) {
   const updateSelection = useAppStore((state) => state.updateSelection);
   const finishSelection = useAppStore((state) => state.finishSelection);
   const setScreenshot = useAppStore((state) => state.setScreenshot);
+  const isProcessing = useAppStore((state) => state.isProcessing);
   const setProcessing = useAppStore((state) => state.setProcessing);
   const setOCRLoading = useAppStore((state) => state.setOCRLoading);
   const setOCRProgress = useAppStore((state) => state.setOCRProgress);
@@ -80,6 +81,9 @@ export function RegionSelector({ onDragStart }: RegionSelectorProps = {}) {
   const captureRegion = async (region: Region) => {
     try {
       setProcessing(true);
+
+      // Hide border before capturing: Wait for React render + Paint
+      await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 50)));
 
       // Import Tauri API dynamically
       const { invoke } = await import('@tauri-apps/api/core');
@@ -168,8 +172,8 @@ export function RegionSelector({ onDragStart }: RegionSelectorProps = {}) {
           fillRule="evenodd"
         />
         
-        {/* Selection Border */}
-        {currentRegion && (
+        {/* Selection Border - Hide when processing to avoid capturing it */}
+        {currentRegion && !isProcessing && (
           <rect
             x={currentRegion.x}
             y={currentRegion.y}

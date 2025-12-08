@@ -124,35 +124,3 @@ fn encode_as_png(image: &RgbaImage) -> Result<Vec<u8>, String> {
 
     Ok(buffer.into_inner())
 }
-
-/// Get information about all monitors
-pub fn get_all_monitors() -> Result<Vec<MonitorInfo>, String> {
-    let monitors = Monitor::all().map_err(|e| format!("Failed to get monitors: {}", e))?;
-
-    Ok(monitors
-        .into_iter()
-        .enumerate()
-        .map(|(idx, m)| MonitorInfo {
-            id: idx as i32,
-            name: m.name().to_string(),
-            x: m.x(),
-            y: m.y(),
-            width: m.width() as i32,
-            height: m.height() as i32,
-            scale_factor: m.scale_factor() as f64,
-            is_primary: m.is_primary(),
-        })
-        .collect())
-}
-
-#[derive(serde::Serialize)]
-pub struct MonitorInfo {
-    pub id: i32,
-    pub name: String,
-    pub x: i32,
-    pub y: i32,
-    pub width: i32,
-    pub height: i32,
-    pub scale_factor: f64,
-    pub is_primary: bool,
-}
