@@ -71,42 +71,103 @@ export function StickyWindow() {
     };
   }, [aspectRatio]);
 
-  const handleClose = async () => {
+  const [isHovered, setIsHovered] = useState(false);
+  const [isPinned, setIsPinned] = useState(true);
+
+  const handleDrag = () => {
+     // @ts-expect-error - startDragging is available in Tauri v2
+     getCurrentWindow().startDragging();
+  };
+  
+  const handleResizeStart = () => {
+    // @ts-expect-error - startResizing is available in Tauri v2
+    getCurrentWindow().startResizing('BottomRight');
+  };
+
+  const handleTogglePin = async () => {
       const win = getCurrentWindow();
-      await win.close();
+      const newState = !isPinned;
+      setIsPinned(newState);
+      await win.setAlwaysOnTop(newState);
+  };
+
+  const handleClose = async () => {
+      console.log("Closing Sticky Window...");
+      try {
+        await invoke('close_window');
+      } catch (e) {
+        console.error("Failed to close sticky window via command", e);
+        const win = getCurrentWindow();
+        await win.close();
+      }
   };
 
   if (!imagePath) return <div className="p-4 text-white">Loading Stick...</div>;
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden bg-transparent">
+    <div 
+        className="relative w-screen h-screen overflow-hidden bg-transparent group"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+    >
         {/* Main Image Layer */}
         <img 
             src={imagePath} 
             alt="Sticky"
-            className="absolute top-0 left-0 w-full h-full object-fill select-none"
-            style={{ pointerEvents: 'none' }}
+            className="absolute top-0 left-0 w-full h-full object-fill select-none pointer-events-none"
         />
         
-        {/* Drag Overlay */}
+        {/* Drag Overlay - Middle Layer */}
         <div 
-           className="absolute inset-0 z-10"
-           data-tauri-drag-region 
+           className="absolute inset-0 z-10 cursor-move"
+           onMouseDown={handleDrag}
         />
 
-        {/* Controls */}
-        <div className="absolute top-2 right-2 z-50 flex gap-1 pointer-events-auto">
-             <div className="px-2 py-1 bg-black/50 text-white text-[10px] rounded backdrop-blur-sm pointer-events-none select-none">
-                Pinned
-             </div>
+        {/* Controls - Top Layer (z-50) */}
+        <div 
+            className={`absolute top-2 right-2 z-50 flex gap-2 pointer-events-auto transition-opacity duration-200 ${isHovered ? 'opacity-100' : 'opacity-0'}`}
+        >
+             {/* Pin Toggle Button */}
+             <button
+                onClick={handleTogglePin}
+                className={`p-1.5 rounded-full backdrop-blur-sm transition-colors cursor-pointer ${
+                    isPinned 
+                    ? 'bg-blue-600/80 text-white hover:bg-blue-700' 
+                    : 'bg-black/50 text-gray-300 hover:bg-black/70 hover:text-white'
+                }`}
+                title={isPinned ? "Unpin (Disable Always On Top)" : "Pin (Always On Top)"}
+             >
+                <div className={`transform transition-transform ${isPinned ? 'rotate-45' : 'rotate-0'}`}>
+                    {/* Simple Pin Icon SVG */}
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="12" y1="17" x2="12" y2="22"></line>
+                        <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"></path>
+                    </svg>
+                </div>
+             </button>
+
+             {/* Close Button */}
              <button 
                 onClick={handleClose}
-                className="p-1 bg-black/50 hover:bg-red-500 text-white rounded-full transition-colors backdrop-blur-sm cursor-pointer"
-                title="Close Pinned Window"
+                className="p-1.5 bg-black/50 hover:bg-red-500 text-white rounded-full transition-colors backdrop-blur-sm cursor-pointer"
+                title="Close"
              >
                 <X size={14} />
              </button>
         </div>
+
+        {/* Resize Handle - Only visible on hover */}
+        {isHovered && (
+             <div 
+                onMouseDown={handleResizeStart}
+                className="absolute bottom-0 right-0 p-1 cursor-se-resize z-50 text-white/80 hover:text-white drop-shadow-md"
+            >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15l-6 6" />
+                    <path d="M21 9l-12 12" />
+                </svg>
+            </div>
+        )}
     </div>
   );
 }

@@ -214,11 +214,11 @@ pub async fn create_sticky_window(
 
     let _win = WebviewWindowBuilder::new(&app, &label, WebviewUrl::App("index.html".into()))
         .title("JustSnap Sticky")
-        .decorations(true)
+        .decorations(false)
         .resizable(true)
         .always_on_top(true)
         .skip_taskbar(true)
-        .transparent(false)
+        .transparent(true)
         .shadow(true)
         .inner_size(width, height)
         .position(x, y)
