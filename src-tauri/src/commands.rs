@@ -86,14 +86,7 @@ pub async fn hide_overlay(app: tauri::AppHandle) -> Result<(), String> {
         // Hide the window completely
         let _ = window.hide();
 
-        // Restore window state (optional, but good for next time)
-        let _ = window.set_fullscreen(false);
-        let _ = window.set_always_on_top(false);
-        let _ = window.set_skip_taskbar(true); // Keep skipped from taskbar
-        let _ = window.set_shadow(false);
-        let _ = window.set_decorations(false);
-
-        // Re-enable cursor events
+        // Re-enable cursor events just in case
         let _ = window.set_ignore_cursor_events(false);
     }
 

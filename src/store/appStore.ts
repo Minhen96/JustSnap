@@ -154,8 +154,7 @@ export const useAppStore = create<AppState>((set) => ({
       console.error('Failed to hide overlay window:', e);
     }
 
-    // Small delay to ensure window is hidden before state reset (prevents Welcome Screen flash)
-    await new Promise(resolve => setTimeout(resolve, 200));
+
 
     set({
       isOverlayActive: false,

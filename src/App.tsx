@@ -110,7 +110,7 @@ function App() {
     }}>
       
       {/* LAYER 1: Background Image (Fake Transparency) */}
-      {isActive && imgSrc && (
+      {imgSrc && (
         <img 
           src={imgSrc} 
           style={{
