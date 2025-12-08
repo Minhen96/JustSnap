@@ -2,7 +2,8 @@
 // Manages app-wide state for overlay, capture mode, screenshots
 
 import { create } from 'zustand';
-import type { CaptureMode, Region, Screenshot, AnnotationTool, Annotation, OCRResult, TranslationResult } from '../types';
+import { shallow } from 'zustand/shallow';
+import type { CaptureMode, Region, Screenshot, AnnotationTool, Annotation, AnnotationStyle, OCRResult, TranslationResult } from '../types';
 
 interface AppState {
   // Overlay state
@@ -20,6 +21,9 @@ interface AppState {
   // Annotation state
   currentTool: AnnotationTool;
   annotations: Annotation[];
+  annotationStyle: AnnotationStyle;
+  annotationHistory: Annotation[][];
+  annotationHistoryStep: number;
 
   // UI state
   showToolbar: boolean;
@@ -55,8 +59,12 @@ interface AppState {
   // Actions - Annotation
   setTool: (tool: AnnotationTool) => void;
   addAnnotation: (annotation: Annotation) => void;
+  updateAnnotation: (id: string, updates: Partial<Annotation>) => void;
   removeAnnotation: (id: string) => void;
   clearAnnotations: () => void;
+  updateAnnotationStyle: (style: Partial<AnnotationStyle>) => void;
+  undoAnnotation: () => void;
+  redoAnnotation: () => void;
 
   // Actions - UI
   setProcessing: (isProcessing: boolean) => void;
@@ -85,6 +93,13 @@ export const useAppStore = create<AppState>((set) => ({
   screenshots: [],
   currentTool: 'none',
   annotations: [],
+  annotationStyle: {
+    color: '#ef4444', // red-500
+    strokeWidth: 3,
+    opacity: 1,
+  },
+  annotationHistory: [[]],
+  annotationHistoryStep: 0,
   showToolbar: false,
   isProcessing: false,
   ocrResult: null,
@@ -149,6 +164,8 @@ export const useAppStore = create<AppState>((set) => ({
       showToolbar: false,
       currentScreenshot: null,
       annotations: [],
+      annotationHistory: [[]],
+      annotationHistoryStep: 0,
       currentTool: 'none',
     });
   },
@@ -184,6 +201,8 @@ export const useAppStore = create<AppState>((set) => ({
     set({
       currentScreenshot: null,
       annotations: [],
+      annotationHistory: [[]],
+      annotationHistoryStep: 0,
       currentTool: 'none',
       ocrResult: null, // Clear OCR results when screenshot is cleared
       ocrLoading: false,
@@ -203,16 +222,65 @@ export const useAppStore = create<AppState>((set) => ({
   setTool: (tool) => set({ currentTool: tool }),
 
   addAnnotation: (annotation) =>
+    set((state) => {
+      const newAnnotations = [...state.annotations, annotation];
+      const newHistory = [...state.annotationHistory.slice(0, state.annotationHistoryStep + 1), newAnnotations];
+      return {
+        annotations: newAnnotations,
+        annotationHistory: newHistory,
+        annotationHistoryStep: state.annotationHistoryStep + 1,
+      };
+    }),
+
+  updateAnnotation: (id, updates) =>
     set((state) => ({
-      annotations: [...state.annotations, annotation],
+      annotations: state.annotations.map((a) => (a.id === id ? { ...a, ...updates } : a)),
     })),
 
   removeAnnotation: (id) =>
+    set((state) => {
+      const newAnnotations = state.annotations.filter((a) => a.id !== id);
+      const newHistory = [...state.annotationHistory.slice(0, state.annotationHistoryStep + 1), newAnnotations];
+      return {
+        annotations: newAnnotations,
+        annotationHistory: newHistory,
+        annotationHistoryStep: state.annotationHistoryStep + 1,
+      };
+    }),
+
+  clearAnnotations: () =>
+    set({
+      annotations: [],
+      annotationHistory: [[]],
+      annotationHistoryStep: 0,
+    }),
+
+  updateAnnotationStyle: (style) =>
     set((state) => ({
-      annotations: state.annotations.filter((a) => a.id !== id),
+      annotationStyle: { ...state.annotationStyle, ...style },
     })),
 
-  clearAnnotations: () => set({ annotations: [] }),
+  undoAnnotation: () =>
+    set((state) => {
+      if (state.annotationHistoryStep > 0) {
+        return {
+          annotationHistoryStep: state.annotationHistoryStep - 1,
+          annotations: state.annotationHistory[state.annotationHistoryStep - 1] || [],
+        };
+      }
+      return {}; // No update
+    }),
+
+  redoAnnotation: () =>
+    set((state) => {
+      if (state.annotationHistoryStep < state.annotationHistory.length - 1) {
+        return {
+          annotationHistoryStep: state.annotationHistoryStep + 1,
+          annotations: state.annotationHistory[state.annotationHistoryStep + 1],
+        };
+      }
+      return {}; // No update
+    }),
 
   // UI actions
   setProcessing: (isProcessing) => set({ isProcessing }),
@@ -239,39 +307,58 @@ export const useAppStore = create<AppState>((set) => ({
 
 // Selectors for common state combinations
 export const useOverlayState = () =>
-  useAppStore((state) => ({
-    isActive: state.isOverlayActive,
-    mode: state.currentMode,
-    show: state.showOverlay,
-    hide: state.hideOverlay,
-    setMode: state.setMode,
-  }));
+  useAppStore(
+    (state) => ({
+      isActive: state.isOverlayActive,
+      mode: state.currentMode,
+      show: state.showOverlay,
+      hide: state.hideOverlay,
+      setMode: state.setMode,
+    }),
+    shallow
+  );
 
 export const useSelectionState = () =>
-  useAppStore((state) => ({
-    region: state.selectedRegion,
-    isSelecting: state.isSelecting,
-    start: state.startSelection,
-    update: state.updateSelection,
-    finish: state.finishSelection,
-    cancel: state.cancelSelection,
-  }));
+  useAppStore(
+    (state) => ({
+      region: state.selectedRegion,
+      isSelecting: state.isSelecting,
+      start: state.startSelection,
+      update: state.updateSelection,
+      finish: state.finishSelection,
+      cancel: state.cancelSelection,
+    }),
+    shallow
+  );
 
 export const useScreenshotState = () =>
-  useAppStore((state) => ({
-    current: state.currentScreenshot,
-    history: state.screenshots,
-    set: state.setScreenshot,
-    clear: state.clearScreenshot,
-    addToHistory: state.addToHistory,
-  }));
+  useAppStore(
+    (state) => ({
+      current: state.currentScreenshot,
+      history: state.screenshots,
+      set: state.setScreenshot,
+      clear: state.clearScreenshot,
+      addToHistory: state.addToHistory,
+    }),
+    shallow
+  );
 
 export const useAnnotationState = () =>
-  useAppStore((state) => ({
-    tool: state.currentTool,
-    annotations: state.annotations,
-    setTool: state.setTool,
-    add: state.addAnnotation,
-    remove: state.removeAnnotation,
-    clear: state.clearAnnotations,
-  }));
+  useAppStore(
+    (state) => ({
+      tool: state.currentTool,
+      annotations: state.annotations,
+      style: state.annotationStyle,
+      canUndo: state.annotationHistoryStep > 0,
+      canRedo: state.annotationHistoryStep < state.annotationHistory.length - 1,
+      setTool: state.setTool,
+      add: state.addAnnotation,
+      update: state.updateAnnotation,
+      remove: state.removeAnnotation,
+      clear: state.clearAnnotations,
+      updateStyle: state.updateAnnotationStyle,
+      undo: state.undoAnnotation,
+      redo: state.redoAnnotation,
+    }),
+    shallow
+  );

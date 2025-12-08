@@ -1,8 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { LogicalSize, LogicalPosition, currentMonitor, getCurrentWindow } from '@tauri-apps/api/window';
 import { X } from 'lucide-react';
-import { useAppStore } from '../../store/appStore';
-import { useAnnotation } from '../../hooks/useAnnotation';
+import { useAppStore, useAnnotationState } from '../../store/appStore';
 import { CanvasStage } from '../annotation/CanvasStage';
 import { AnnotationToolbar } from '../annotation/AnnotationToolbar';
 import { AskReactPanel } from '../ai/AskReactPanel';
@@ -22,19 +21,20 @@ export function ScreenshotEditor() {
   // We now use separate windows. Keeping isPinned=false allows code structure to remain valid.
   const isPinned = false;
 
-  const {
-    currentTool,
-    setCurrentTool,
-    annotations,
-    addAnnotation,
-    updateAnnotation,
-    undo,
-    redo,
-    canUndo,
-    canRedo,
-    currentStyle,
-    updateStyle,
-  } = useAnnotation();
+  // Get state values
+  const currentTool = useAppStore((state) => state.currentTool);
+  const annotations = useAppStore((state) => state.annotations);
+  const currentStyle = useAppStore((state) => state.annotationStyle);
+  const canUndo = useAppStore((state) => state.annotationHistoryStep > 0);
+  const canRedo = useAppStore((state) => state.annotationHistoryStep < state.annotationHistory.length - 1);
+
+  // Get action functions (these never change)
+  const setCurrentTool = useAppStore((state) => state.setTool);
+  const addAnnotation = useAppStore((state) => state.addAnnotation);
+  const updateAnnotation = useAppStore((state) => state.updateAnnotation);
+  const updateStyle = useAppStore((state) => state.updateAnnotationStyle);
+  const undo = useAppStore((state) => state.undoAnnotation);
+  const redo = useAppStore((state) => state.redoAnnotation);
 
   // Calculate canvas dimensions based on screenshot
   useEffect(() => {
@@ -355,16 +355,18 @@ export function ScreenshotEditor() {
                  </button>
              </div>
         )}
-        <CanvasStage
-          imageUrl={currentScreenshot.imageData}
-          annotations={annotations}
-          width={dimensions.width}
-          height={dimensions.height}
-          currentTool={currentTool}
-          currentStyle={currentStyle}
-          onAddAnnotation={addAnnotation}
-          onUpdateAnnotation={updateAnnotation}
-        />
+        {currentScreenshot && (
+          <CanvasStage
+            imageUrl={currentScreenshot.imageData}
+            annotations={annotations}
+            width={dimensions.width}
+            height={dimensions.height}
+            currentTool={currentTool}
+            currentStyle={currentStyle}
+            onAddAnnotation={addAnnotation}
+            onUpdateAnnotation={updateAnnotation}
+          />
+        )}
       </div>
 
       {/* Annotation Toolbar - Only show if NOT pinned */}
