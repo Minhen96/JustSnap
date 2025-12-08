@@ -38,47 +38,41 @@ function App() {
 
     const setup = async () => {
       if (!isTauri) return;
+
+      // Tauri Setup
       try {
         const { listen } = await import('@tauri-apps/api/event');
         
         await listen('hotkey-triggered', async () => {
-           console.log('[App] Hotkey triggered! Resetting window and state...');
-           
-           // Clear previous image to force loading state
+           console.log('[App] Hotkey triggered!');
+
+           const state = useAppStore.getState();
+
+           // STEP 1: Reset state (clear any active screenshot/annotations)
+           // We do NOT hide the window here because the backend just showed it.
+           state.clearScreenshot();
+
+           // STEP 2: Always open fresh overlay
+           console.log('[App] Opening fresh overlay...');
+
+           // Clear previous image
            setImgSrc(null);
-           
-           // Reset window to full screen overlay mode
-           const { getCurrentWindow, LogicalPosition, currentMonitor, LogicalSize } = await import('@tauri-apps/api/window');
+
+           // Setup window for capture
+           const { getCurrentWindow } = await import('@tauri-apps/api/window');
            const win = getCurrentWindow();
-           
+
            try {
-             // Forcefully reset state
-             await win.setFullscreen(false);
-             await win.setResizable(true); 
-             
-             const monitor = await currentMonitor();
-             if (monitor) {
-               const width = monitor.size.width / monitor.scaleFactor;
-               const height = monitor.size.height / monitor.scaleFactor;
-               console.log(`[App] Setting window size to ${width}x${height}`);
-               await win.setSize(new LogicalSize(width, height));
-               await win.setPosition(new LogicalPosition(0, 0));
-             }
-             
-             await win.setResizable(false);
-             await win.setAlwaysOnTop(true);
-             await win.setDecorations(false);
-             await win.setSkipTaskbar(true);
-             
-             // Ensure visible
-             await win.show();
+             // Backend handles window size/position/fullscreen
              await win.setFocus();
-             
+
            } catch (err) {
-             console.error('[App] Window reset failed:', err);
+             console.error('[App] Window setup failed:', err);
            }
-           
-           useAppStore.getState().showOverlay('capture');
+
+           // Activate overlay
+           state.showOverlay('capture');
+           console.log('[App] Overlay activated');
         });
 
         await listen('screen-capture-ready', (e: any) => {
@@ -133,19 +127,7 @@ function App() {
         />
       )}
 
-      {/* LAYER 2: Loading Screen (if Active but No Image) */}
-      {isActive && !imgSrc && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-blue-600 text-white">
-          <div className="text-center">
-            <h2 className="text-2xl font-bold mb-2">Capturing Screen...</h2>
-            <p>Please wait...</p>
-          </div>
-        </div>
-      )}
-
-
-
-      {/* LAYER 4: SnipOverlay */}
+      {/* LAYER 2: SnipOverlay */}
       {isActive && !currentScreenshot && (
         <div className="absolute inset-0 z-30">
           <ErrorBoundary>
@@ -154,7 +136,7 @@ function App() {
         </div>
       )}
       
-      {/* LAYER 5: Screenshot Editor */}
+      {/* LAYER 3: Screenshot Editor */}
       {currentScreenshot && (
         <div className="absolute inset-0 z-40">
           <ErrorBoundary>

@@ -204,11 +204,11 @@ export const useAppStore = create<AppState>((set) => ({
       annotationHistory: [[]],
       annotationHistoryStep: 0,
       currentTool: 'none',
-      ocrResult: null, // Clear OCR results when screenshot is cleared
+      ocrResult: null,
       ocrLoading: false,
       ocrProgress: 0,
       ocrError: null,
-      translationResult: null, // Clear translation results when screenshot is cleared
+      translationResult: null,
       translationLoading: false,
       translationError: null,
     }),

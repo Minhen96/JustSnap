@@ -88,6 +88,7 @@ pub fn run() {
             Ok(())
         })
         // Handle invocations from the frontend.
+        // Registers functions that can be called from JavaScript (window.invoke()).
         .invoke_handler(tauri::generate_handler![
             // Screen Capture
             commands::capture_screen,
@@ -110,6 +111,7 @@ pub fn run() {
             commands::create_ai_panel_window,
             commands::create_translation_window,
         ])
+        // generate_context!() : Loads config from: tauri.conf.json and Cargo.toml
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
