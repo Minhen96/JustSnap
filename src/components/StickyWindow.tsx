@@ -1,6 +1,6 @@
 
 import { useEffect, useState } from 'react';
-import { X } from 'lucide-react';
+import { X, Copy, Save } from 'lucide-react';
 import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
 import { invoke } from '@tauri-apps/api/core';
 import { convertFileSrc } from '@tauri-apps/api/core';
@@ -14,6 +14,7 @@ export function StickyWindow() {
   const [imagePath, setImagePath] = useState<string | null>(null);
   const [aspectRatio, setAspectRatio] = useState<number>(1);
   const [dimensions, setDimensions] = useState<Dimensions>({ width: 0, height: 0 });
+  const [feedback, setFeedback] = useState<string | null>(null);
 
   useEffect(() => {
     // 1. Get the injected image data URL
@@ -75,13 +76,7 @@ export function StickyWindow() {
   const [isPinned, setIsPinned] = useState(true);
 
   const handleDrag = () => {
-     // @ts-expect-error - startDragging is available in Tauri v2
      getCurrentWindow().startDragging();
-  };
-  
-  const handleResizeStart = () => {
-    // @ts-expect-error - startResizing is available in Tauri v2
-    getCurrentWindow().startResizing('BottomRight');
   };
 
   const handleTogglePin = async () => {
@@ -100,6 +95,61 @@ export function StickyWindow() {
         const win = getCurrentWindow();
         await win.close();
       }
+  };
+
+  const handleCopy = async () => {
+      if (!imagePath) return;
+      try {
+         const response = await fetch(imagePath);
+         const blob = await response.blob();
+         
+         // Try frontend clipboard first
+         try {
+             await navigator.clipboard.write([
+                 new ClipboardItem({ 'image/png': blob })
+             ]);
+             setFeedback("Copied!");
+         } catch (e) {
+             console.warn("Frontend copy failed, trying backend", e);
+             // Backend fallback
+             const buffer = await blob.arrayBuffer();
+             const bytes = new Uint8Array(buffer);
+             await invoke('copy_image_to_clipboard', { imageData: Array.from(bytes) });
+             setFeedback("Copied!");
+         }
+      } catch (e) {
+          console.error("Copy failed", e);
+          setFeedback("Copy Failed");
+      }
+      setTimeout(() => setFeedback(null), 2000);
+  };
+
+  const handleSave = async () => {
+      if (!imagePath) return;
+      try {
+          const response = await fetch(imagePath);
+          const blob = await response.blob();
+          const buffer = await blob.arrayBuffer();
+          const bytes = new Uint8Array(buffer);
+
+          const win = getCurrentWindow();
+          // Hide briefly to interact with dialog? No, dialog is separate window usually. 
+          // Actually, save dialog is native, it might block.
+          // Tauri open_save_dialog is async.
+          
+          const path = await invoke<string | null>('open_save_dialog');
+          if (path) {
+              await invoke('save_image', {
+                  path,
+                  imageData: Array.from(bytes)
+              });
+              setFeedback("Saved!");
+          }
+      } catch (e) {
+          console.error("Save failed", e);
+          setFeedback("Save Failed");
+      }
+      setTimeout(() => setFeedback(null), 2000);
   };
 
   if (!imagePath) return <div className="p-4 text-white">Loading Stick...</div>;
@@ -146,6 +196,24 @@ export function StickyWindow() {
                 </div>
              </button>
 
+             {/* Copy Button */}
+             <button 
+                onClick={handleCopy}
+                className="p-1.5 bg-black/50 hover:bg-blue-500 text-white rounded-full transition-colors backdrop-blur-sm cursor-pointer"
+                title="Copy to Clipboard"
+             >
+                <Copy size={14} />
+             </button>
+
+             {/* Save Button */}
+             <button 
+                onClick={handleSave}
+                className="p-1.5 bg-black/50 hover:bg-purple-500 text-white rounded-full transition-colors backdrop-blur-sm cursor-pointer"
+                title="Save as Image"
+             >
+                <Save size={14} />
+             </button>
+
              {/* Close Button */}
              <button 
                 onClick={handleClose}
@@ -159,7 +227,6 @@ export function StickyWindow() {
         {/* Resize Handle - Only visible on hover */}
         {isHovered && (
              <div 
-                onMouseDown={handleResizeStart}
                 className="absolute bottom-0 right-0 p-1 cursor-se-resize z-50 text-white/80 hover:text-white drop-shadow-md"
             >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
@@ -167,6 +234,15 @@ export function StickyWindow() {
                     <path d="M21 9l-12 12" />
                 </svg>
             </div>
+        )}
+
+        {/* Toast Feedback */}
+        {feedback && (
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[60] animate-in fade-in duration-300 pointer-events-none">
+              <div className="bg-black/70 text-white text-xs px-3 py-1.5 rounded-full backdrop-blur-md shadow-lg">
+                  {feedback}
+              </div>
+          </div>
         )}
     </div>
   );

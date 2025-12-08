@@ -20,7 +20,6 @@ import {
   X,
   ScanText,
   Languages,
-  MessageSquare,
   FileCode,
 } from 'lucide-react';
 import { ColorPickerPopover } from './ColorPickerPopover';
@@ -94,6 +93,18 @@ export function AnnotationToolbar({
   const [showOCRPanel, setShowOCRPanel] = useState(false);
   const [showTranslationPanel, setShowTranslationPanel] = useState(false);
   const colorButtonRef = useRef<HTMLButtonElement>(null);
+  const dropdownContainerRef = useRef<HTMLDivElement>(null);
+  const [isNearBottom, setIsNearBottom] = useState(false);
+
+  // Check dropdown position on open or mount
+  useEffect(() => {
+    if (showAiDropdown && dropdownContainerRef.current) {
+        const rect = dropdownContainerRef.current.getBoundingClientRect();
+        const spaceBelow = window.innerHeight - rect.bottom;
+        // If less than 180px below, flip it up
+        setIsNearBottom(spaceBelow < 180);
+    }
+  }, [showAiDropdown]);
 
   // OCR State from store
   const ocrLoading = useAppStore((state) => state.ocrLoading);
@@ -238,98 +249,101 @@ export function AnnotationToolbar({
 
           {/* AI Tools */}
           <div className="flex items-center gap-1 pr-2 border-r border-gray-300">
-            {/* OCR Button with Loading Animation */}
+            {/* OCR Button */}
             <button
               onClick={() => setShowOCRPanel(true)}
               className={`
-                relative p-2 rounded-lg transition-all border border-gray-300
-                ${ocrResult
-                  ? 'bg-green-50 text-green-600 border-green-300'
-                  : ocrLoading
+                relative p-2 rounded-lg transition-all border
+                ${ocrLoading
                   ? 'bg-blue-50 text-blue-600 border-blue-300'
                   : ocrError
                   ? 'bg-red-50 text-red-600 border-red-300'
-                  : 'bg-white hover:bg-purple-50 text-gray-700 hover:text-purple-600'
+                  : 'bg-white hover:bg-green-50 text-gray-700 hover:text-green-600 border-gray-300 hover:border-green-300'
                 }
               `}
-              title={ocrResult ? 'View OCR Results (Ready ✓)' : ocrLoading ? 'OCR Processing...' : ocrError ? 'OCR Failed (Retry)' : 'Extract Text (OCR)'}
+              title={ocrResult ? 'View OCR Results' : ocrLoading ? 'Processing...' : 'Extract Text (OCR)'}
             >
-              {/* Border Loading Animation */}
               {ocrLoading && (
                 <div className="absolute inset-0 rounded-lg overflow-hidden pointer-events-none">
                   <div
                     className="absolute inset-0 border-2 border-transparent rounded-lg"
                     style={{
-                      borderTopColor: '#3b82f6',
-                      borderRightColor: '#3b82f6',
-                      animation: 'spin 2s linear infinite'
+                      borderTopColor: 'currentColor',
+                      borderRightColor: 'currentColor',
+                      animation: 'spin 2s linear infinite',
+                      opacity: 0.5
                     }}
                   />
                 </div>
               )}
-
-              {/* Ready Indicator */}
               {ocrResult && !ocrLoading && (
-                <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white shadow-sm" />
+                <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white" />
               )}
-
-              {/* Error Indicator */}
-              {ocrError && !ocrLoading && (
-                <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white shadow-sm" />
-              )}
-
-              <ScanText size={20} className="relative z-10" />
+              <ScanText size={20} />
             </button>
-            {/* Translation Button - Only enabled when OCR text exists */}
+
+            {/* Translation Button */}
             <button
               onClick={() => setShowTranslationPanel(true)}
               disabled={!ocrResult || !ocrResult.text.trim()}
-              className={`relative p-2 rounded-lg transition-all border ${
-                !ocrResult || !ocrResult.text.trim()
-                  ? 'bg-white text-gray-400 border-gray-300 opacity-50 cursor-not-allowed'
-                  : 'bg-white hover:bg-purple-50 text-purple-600 border-purple-300'
-              }`}
-              title={!ocrResult || !ocrResult.text.trim() ? 'Translation (OCR text required)' : 'Translate'}
+              className={`
+                p-2 rounded-lg transition-all border
+                ${!ocrResult || !ocrResult.text.trim()
+                  ? 'bg-white text-gray-300 border-gray-200 cursor-not-allowed'
+                  : 'bg-white hover:bg-purple-50 text-gray-700 hover:text-purple-600 border-gray-300 hover:border-purple-300'
+                }
+              `}
+              title={!ocrResult ? 'Translate (Extract Text first)' : 'Translate Text'}
             >
               <Languages size={20} />
             </button>
-            <button
-              className="p-2 rounded-lg bg-white hover:bg-gray-100 text-gray-700 border border-gray-300 opacity-50 cursor-not-allowed"
-              title="AI Chat (Coming Soon)"
-              disabled
-            >
-              <MessageSquare size={20} />
-            </button>
             
-            {/* Generate Code Button with Framework Dropdown */}
+            {/* Generate Code Button with Smart Dropdown */}
             <div
               className="relative"
               onMouseEnter={clearHideAiDropdownTimeout}
               onMouseLeave={scheduleHideAiDropdown}
+              ref={dropdownContainerRef}
             >
               <button
                 onClick={() => {
-                  // small delay to avoid accidental clicks
                   clearHideAiDropdownTimeout();
-                  setTimeout(() => setShowAiDropdown((prev) => !prev), 120);
+                  setTimeout(() => setShowAiDropdown((prev) => !prev), 100);
                 }}
-                className="p-2 rounded-lg bg-blue-600 text-white hover:bg-blue-500 border border-blue-600 shadow-sm flex items-center gap-1"
+                className={`
+                    p-2 rounded-lg transition-all border flex items-center gap-1
+                    ${showAiDropdown 
+                        ? 'bg-blue-50 text-blue-600 border-blue-300' 
+                        : 'bg-white hover:bg-blue-50 text-gray-700 hover:text-blue-600 border-gray-300'
+                    }
+                `}
                 title="Generate UI Code"
               >
                 <FileCode size={20} />
               </button>
 
               {showAiDropdown && (
-                <div className="absolute top-full left-0 mt-1 bg-white rounded-lg shadow-xl border border-gray-200 min-w-[150px] overflow-hidden z-10">
+                <div 
+                    className={`
+                        absolute left-0 mt-1 bg-white rounded-lg shadow-xl border border-gray-200 min-w-[150px] overflow-hidden z-50
+                        ${isNearBottom ? 'bottom-full mb-2 top-auto' : 'top-full mt-1'}
+                    `}
+                >
+                  <div className="px-3 py-2 bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                    Generate Code
+                  </div>
                   {(['react', 'vue', 'flutter'] as AskFramework[]).map((fw) => (
                     <button
                       key={fw}
                       onClick={() => handleFrameworkSelect(fw)}
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 text-gray-800"
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 text-gray-700 hover:text-blue-700 transition-colors flex items-center justify-between group"
                     >
-                      {fw === 'react' && 'React'}
-                      {fw === 'vue' && 'Vue'}
-                      {fw === 'flutter' && 'Flutter'}
+                      <span>
+                        {fw === 'react' && 'React'}
+                        {fw === 'vue' && 'Vue'}
+                        {fw === 'flutter' && 'Flutter'}
+                      </span>
+                      <ArrowRight size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" />
                     </button>
                   ))}
                 </div>
@@ -343,10 +357,10 @@ export function AnnotationToolbar({
               onClick={onStick}
               className={`p-2 rounded-lg border transition-all ${
                 isPinned 
-                  ? 'bg-green-600 text-white border-green-700 shadow-inner' 
-                  : 'bg-white hover:bg-green-50 text-green-600 border-green-200'
+                  ? 'bg-orange-100 text-orange-600 border-orange-300' 
+                  : 'bg-white hover:bg-orange-100 text-orange-600 border-orange-300'
               }`}
-              title={isPinned ? "Unpin from Screen" : "Stick on Screen (Always on Top)"}
+              title={isPinned ? "Unpin" : "Pin Screenshot"}
             >
               <Pin size={20} className={isPinned ? "fill-current" : ""} />
             </button>

@@ -2,7 +2,7 @@
 // Reference: use_case.md lines 64-93 (Screen Capture toolbar)
 
 import { useRef, useEffect, useState } from 'react';
-import { Stage, Layer, Image as KonvaImage, Line, Rect, Circle, Arrow, Text } from 'react-konva';
+import { Stage, Layer, Image as KonvaImage, Line, Rect, Ellipse, Arrow, Text } from 'react-konva';
 import type Konva from 'konva';
 import type { Annotation, AnnotationTool, AnnotationStyle } from '../../types';
 
@@ -321,11 +321,12 @@ export function CanvasStage({
 
       case 'circle':
         return (
-          <Circle
+          <Ellipse
             key={id}
             x={x + width / 2}
             y={y + height / 2}
-            radius={Math.sqrt(width * width + height * height) / 2}
+            radiusX={Math.abs(width) / 2}
+            radiusY={Math.abs(height) / 2}
             stroke={color}
             strokeWidth={strokeWidth}
             opacity={opacity}

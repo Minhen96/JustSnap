@@ -91,11 +91,11 @@ export const useAppStore = create<AppState>((set) => ({
   isSelecting: false,
   currentScreenshot: null,
   screenshots: [],
-  currentTool: 'none',
+  currentTool: 'rectangle', // Default to rectangle
   annotations: [],
   annotationStyle: {
-    color: '#ef4444', // red-500
-    strokeWidth: 3,
+    color: '#ff0000', // red (#ff0000)
+    strokeWidth: 2,
     opacity: 1,
   },
   annotationHistory: [[]],
@@ -165,7 +165,7 @@ export const useAppStore = create<AppState>((set) => ({
       annotations: [],
       annotationHistory: [[]],
       annotationHistoryStep: 0,
-      currentTool: 'none',
+      currentTool: 'rectangle',
     });
   },
 
@@ -202,7 +202,7 @@ export const useAppStore = create<AppState>((set) => ({
       annotations: [],
       annotationHistory: [[]],
       annotationHistoryStep: 0,
-      currentTool: 'none',
+      currentTool: 'rectangle',
       ocrResult: null,
       ocrLoading: false,
       ocrProgress: 0,

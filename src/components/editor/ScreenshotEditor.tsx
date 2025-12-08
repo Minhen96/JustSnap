@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
-import { LogicalSize, LogicalPosition, currentMonitor, getCurrentWindow } from '@tauri-apps/api/window';
+import { currentMonitor, getCurrentWindow } from '@tauri-apps/api/window';
 import { X } from 'lucide-react';
-import { useAppStore, useAnnotationState } from '../../store/appStore';
+import { useAppStore } from '../../store/appStore';
 import { CanvasStage } from '../annotation/CanvasStage';
 import { AnnotationToolbar } from '../annotation/AnnotationToolbar';
 import { AskReactPanel } from '../ai/AskReactPanel';
@@ -237,11 +237,7 @@ export function ScreenshotEditor() {
 
   const handleGenerateAiCode = useCallback(
     async (framework: AskFramework) => {
-      // Approach 2: Create a new standalone window for AI Panel
-      // This mimics the "Stick" functionality which works well vertically/horizontally
-      
       // Get current screen metrics to position the new window
-      const win = getCurrentWindow();
       const monitor = await currentMonitor();
       if (!monitor) return;
 
