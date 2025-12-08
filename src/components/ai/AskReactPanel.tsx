@@ -2,6 +2,7 @@
 // Dedicated flow: generate prompt from snip -> generate framework-specific code JSON -> download/copy
 
 import { useEffect, useState } from 'react';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useAskReact } from '../../hooks/useAskReact';
 import { exportText, generateFileName } from '../../utils/file';
 import type { AskFramework } from '../../types';
@@ -118,32 +119,35 @@ export function AskReactPanel({
     const promptResult = await generatePrompt(userPrompt.trim() || undefined);
     if (!promptResult) return;
     
-    // Step 2: Generate code
     await generateCode(promptResult.prompt);
+  };
+
+  const handleResizeStart = () => {
+    // @ts-expect-error - startResizing is available in Tauri v2 but typings might be missing
+    getCurrentWindow().startResizing('BottomRight');
   };
 
   return (
     <div className="fixed inset-0 bg-white rounded-xl shadow-2xl border border-gray-100 z-50 flex flex-col pointer-events-auto overflow-hidden">
       {/* Header - Draggable Area */}
       <div 
-        className="h-10 bg-gray-50 border-b flex items-center justify-between px-4 select-none"
+        data-tauri-drag-region
+        className="h-10 bg-gray-50 border-b flex items-center justify-between px-4 select-none cursor-grab active:cursor-grabbing"
       >
-        <div 
-          data-tauri-drag-region
-          className="flex-1 flex items-center gap-2 h-full cursor-grab active:cursor-grabbing"
-        >
-          <div className="font-semibold text-sm text-gray-700 pointer-events-none">
+        <div className="flex items-center gap-2 pointer-events-none">
+          <div className="font-semibold text-sm text-gray-700">
             Generate {frameworkLabels[framework]} UI code
           </div>
         </div>
         
         <div className="flex items-center gap-2">
-          <div className="text-xs text-gray-400 mr-2">
+          <div className="text-xs text-gray-400 mr-2 pointer-events-none">
             Autosaved to desktop
           </div>
+          {/* Close button - Ensure it sits above drag region */}
           <button 
             onClick={onClose}
-            className="p-1 hover:bg-gray-200 rounded text-gray-500 hover:text-gray-700 transition-colors z-50 cursor-pointer"
+            className="p-1 hover:bg-gray-200 rounded text-gray-500 hover:text-gray-700 transition-colors z-50 cursor-pointer relative"
             title="Close"
           >
             <X size={18} />
@@ -237,6 +241,17 @@ export function AskReactPanel({
             <p className="text-sm text-red-600">{error}</p>
           </div>
         )}
+      </div>
+      
+      {/* Resize Handle (Bottom Right) */}
+      <div 
+        onMouseDown={handleResizeStart}
+        className="absolute bottom-0 right-0 p-1 cursor-se-resize z-50 text-gray-400 hover:text-gray-600"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+           <path d="M21 15l-6 6" />
+           <path d="M21 9l-12 12" />
+        </svg>
       </div>
     </div>
   );

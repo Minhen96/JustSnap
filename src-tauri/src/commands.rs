@@ -256,7 +256,7 @@ pub async fn create_ai_panel_window(
         .resizable(true) // Start resizable for dragging
         .always_on_top(false) // Allow interaction with other windows
         .skip_taskbar(false) // Process should be visible
-        .transparent(false) // White background
+        .transparent(true) // Transparent to avoid white box issues
         .shadow(true)
         .inner_size(width, height)
         .position(x, y)
@@ -290,7 +290,7 @@ pub async fn create_translation_window(
         .resizable(true)
         .always_on_top(false)
         .skip_taskbar(false)
-        .transparent(false)
+        .transparent(true)
         .shadow(true)
         .inner_size(width, height)
         .position(x, y)
@@ -299,4 +299,9 @@ pub async fn create_translation_window(
         .map_err(|e| e.to_string())?;
 
     Ok(())
+}
+
+#[command]
+pub async fn close_window(window: tauri::Window) -> Result<(), String> {
+    window.close().map_err(|e| e.to_string())
 }

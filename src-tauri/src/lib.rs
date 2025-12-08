@@ -110,6 +110,7 @@ pub fn run() {
             commands::create_sticky_window,
             commands::create_ai_panel_window,
             commands::create_translation_window,
+            commands::close_window,
         ])
         // generate_context!() : Loads config from: tauri.conf.json and Cargo.toml
         .run(tauri::generate_context!())
