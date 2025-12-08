@@ -75,9 +75,6 @@ export async function callAiChat(messages: any[]): Promise<string> {
   }
 }
 
-// Legacy alias for compatibility
-export const callGeminiChat = callAiChat;
-
 function safeParseJson<T>(raw: string): T {
   // Strip common markdown fences if present
   const cleaned = raw
@@ -193,42 +190,3 @@ export const askReactGenerateCode = (
   preparedPrompt: string
 ): Promise<AskReactCodeResult> =>
   askFrameworkGenerateCode(imageBase64, 'react', preparedPrompt);
-
-// Other placeholders
-
-export async function summarizeScreenshot(imageBase64: string): Promise<AISummary> {
-  return {
-    summary: 'Summary not implemented yet.',
-    keyPoints: [],
-    timestamp: Date.now(),
-  };
-}
-
-export async function translateText(
-  text: string,
-  targetLang: 'en' | 'zh' | 'ms'
-): Promise<TranslationResult> {
-  return {
-    translatedText: text,
-    detectedSourceLanguage: 'auto',
-    targetLanguage: targetLang,
-    sourceText: text,
-  };
-}
-
-export async function generateCodeFromScreenshot(
-  imageBase64: string,
-  framework: 'react' | 'vue' | 'flutter' | 'html' | 'nextjs'
-): Promise<AICodeGeneration> {
-  return {
-    framework,
-    code: '// Placeholder',
-    styles: '',
-    dependencies: [],
-    fileName: 'Placeholder.tsx'
-  };
-}
-
-export async function explainScreenshot(imageBase64: string): Promise<string> {
-  return "Explanation not implemented.";
-}

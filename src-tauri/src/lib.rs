@@ -3,7 +3,6 @@
 // Module declarations
 mod commands;
 mod hotkeys;
-mod overlays;
 mod screen_capture;
 mod utils;
 
