@@ -71,15 +71,12 @@ pub async fn show_overlay(app: tauri::AppHandle) -> Result<(), String> {
         let _ = window.set_ignore_cursor_events(false);
     }
 
-    println!("Showing overlay");
     Ok(())
 }
 
 #[command]
 pub async fn hide_overlay(app: tauri::AppHandle) -> Result<(), String> {
     use tauri::Manager;
-
-    println!("Hiding overlay");
 
     // Get the main window
     if let Some(window) = app.get_webview_window("main") {
@@ -109,10 +106,9 @@ pub async fn save_image(path: String, image_data: Vec<u8>) -> Result<(), String>
     Ok(())
 }
 
+// Note: save_text is currently unused but kept for future text export features
 #[command]
 pub async fn save_text(_content: String, file_name: String) -> Result<String, String> {
-    // TODO: Save text to file system
-    println!("Saving text: {}", file_name);
     Ok(format!("C:\\Users\\Desktop\\{}.txt", file_name))
 }
 
@@ -209,8 +205,11 @@ pub async fn create_sticky_window(
 
     let label = format!("sticky_{}", chrono::Utc::now().timestamp_micros());
 
-    // Inject src directly
-    let init_script = format!("window.__STICKY_IMAGE_SRC__ = {:?};", image_src);
+    // Inject window type and image src
+    let init_script = format!(
+        "window.__WINDOW_TYPE__ = 'sticky'; window.__STICKY_IMAGE_SRC__ = {:?};",
+        image_src
+    );
 
     let _win = WebviewWindowBuilder::new(&app, &label, WebviewUrl::App("index.html".into()))
         .title("JustSnap Sticky")
@@ -243,10 +242,9 @@ pub async fn create_ai_panel_window(
 
     let label = format!("ai_panel_{}", chrono::Utc::now().timestamp_micros());
 
-    // Inject data directly
-    // JSON stringify the framework to be safe
+    // Inject window type and data
     let init_script = format!(
-        "window.__AI_PANEL_DATA__ = {{ imageSrc: {:?}, framework: {:?} }};",
+        "window.__WINDOW_TYPE__ = 'ai_panel'; window.__AI_PANEL_DATA__ = {{ imageSrc: {:?}, framework: {:?} }};",
         image_src, framework
     );
 
@@ -278,8 +276,11 @@ pub async fn create_translation_window(
 
     let label = format!("translation_{}", chrono::Utc::now().timestamp_micros());
 
-    // Inject text directly
-    let init_script = format!("window.__TRANSLATION_TEXT__ = {:?};", text);
+    // Inject window type and text
+    let init_script = format!(
+        "window.__WINDOW_TYPE__ = 'translation'; window.__TRANSLATION_TEXT__ = {:?};",
+        text
+    );
 
     let width = 400.0;
     let height = 600.0;

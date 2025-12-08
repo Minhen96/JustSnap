@@ -1,25 +1,23 @@
-import { useEffect, useState, useCallback } from 'react';
-import { currentMonitor, getCurrentWindow } from '@tauri-apps/api/window';
-import { X } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useAppStore } from '../../store/appStore';
-import { CanvasStage } from '../annotation/CanvasStage';
+import { ScreenshotCanvas } from './ScreenshotCanvas';
 import { AnnotationToolbar } from '../annotation/AnnotationToolbar';
+import { ScreenshotFeedback } from './ScreenshotFeedback';
 import { AskReactPanel } from '../ai/AskReactPanel';
+import { useScreenshotKeyboard } from '../../hooks/useScreenshotKeyboard';
+import { useScreenshotActions } from './ScreenshotActions';
+import { hideAndCleanup } from '../../utils/windowManager';
 import type { AskFramework } from '../../types';
 
 export function ScreenshotEditor() {
   const [showAskReact, setShowAskReact] = useState(false);
   const [initialAskFramework, setInitialAskFramework] = useState<AskFramework>('react');
   const [askPanelImage, setAskPanelImage] = useState<string | null>(null);
-  const [editorHidden, setEditorHidden] = useState(false);
   const currentScreenshot = useAppStore((state) => state.currentScreenshot);
   const clearScreenshot = useAppStore((state) => state.clearScreenshot);
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
-  // const isPinned = false; // Disabled internal stick
-  // We now use separate windows. Keeping isPinned=false allows code structure to remain valid.
-  const isPinned = false;
 
   // Get state values
   const currentTool = useAppStore((state) => state.currentTool);
@@ -47,232 +45,31 @@ export function ScreenshotEditor() {
     });
   }, [currentScreenshot]);
 
-  const closeOverlayAndReset = useCallback(async () => {
-    const win = getCurrentWindow();
-    await win.hide();
-    
-    // Slight delay to allow hide animation if any, then reset
-    setTimeout(async () => {
-        clearScreenshot();
-        setFeedback(null);
-        setEditorHidden(false);
-        setAskPanelImage(null);
-        setShowAskReact(false);
+  const handleClose = async () => {
+    await hideAndCleanup(() => {
+      clearScreenshot();
+      setFeedback(null);
+      setAskPanelImage(null);
+      setShowAskReact(false);
     }, 100);
-  }, [clearScreenshot]);
+  };
 
-  const handleClose = useCallback(async () => {
-    await closeOverlayAndReset();
-  }, [closeOverlayAndReset]);
+  // Keyboard shortcuts hook
+  useScreenshotKeyboard({
+    onUndo: undo,
+    onRedo: redo,
+    onSetTool: setCurrentTool,
+    onClose: handleClose,
+  });
 
-  // Handle keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Undo/Redo
-      if (e.ctrlKey && e.key === 'z') {
-        e.preventDefault();
-        undo();
-      }
-      if (e.ctrlKey && e.key === 'y') {
-        e.preventDefault();
-        redo();
-      }
-
-      // Tool shortcuts
-      if (!e.ctrlKey && !e.altKey && !e.metaKey) {
-        switch (e.key.toLowerCase()) {
-          case 'p':
-            setCurrentTool('pen');
-            break;
-          case 'h':
-            setCurrentTool('highlighter');
-            break;
-          case 'r':
-            setCurrentTool('rectangle');
-            break;
-          case 'c':
-            setCurrentTool('circle');
-            break;
-          case 'a':
-            setCurrentTool('arrow');
-            break;
-          case 't':
-            setCurrentTool('text');
-            break;
-          case 'b':
-            setCurrentTool('blur');
-            break;
-          case 'escape':
-            handleClose();
-            break;
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [undo, redo, setCurrentTool, handleClose]);
-
-  const exportCanvasAsDataURL = useCallback(() => {
-    const stage = (window as any).__konvaStage;
-    if (stage) {
-      return stage.toDataURL({ pixelRatio: 2 });
-    }
-    return currentScreenshot?.imageData || '';
-  }, [currentScreenshot]);
-
-  const handleCopy = useCallback(async () => {
-    const win = getCurrentWindow();
-    try {
-      // 1. Hide immediately for "instant" feel
-      await win.hide();
-      
-      const dataURL = exportCanvasAsDataURL();
-      const response = await fetch(dataURL);
-      const blob = await response.blob();
-
-      // Try frontend clipboard first
-      let success = false;
-      if (navigator.clipboard && window.ClipboardItem) {
-        try {
-          await navigator.clipboard.write([
-            new ClipboardItem({ 'image/png': blob })
-          ]);
-          success = true;
-        } catch (err) {
-          console.warn('Frontend clipboard failed, trying backend:', err);
-        }
-      }
-
-      if (!success) {
-        // Fallback to backend
-        const buffer = await blob.arrayBuffer();
-        const bytes = new Uint8Array(buffer);
-        const { invoke } = await import('@tauri-apps/api/core');
-        await invoke('copy_image_to_clipboard', { imageData: Array.from(bytes) });
-      }
-
-      // 2. Finalize
-      handleClose(); 
-
-    } catch (error) {
-      console.error('Failed to copy:', error);
-      // If failed, we must show the window again to inform user
-      await win.show();
-      setFeedback('Failed to copy');
-    }
-  }, [exportCanvasAsDataURL, handleClose]);
-
-  const handleSave = useCallback(async () => {
-    try {
-      const win = getCurrentWindow();
-      // Hide window temporarily so user can see/interact with save dialog/desktop if needed
-      // But we need the dataURL first!
-      const dataURL = exportCanvasAsDataURL();
-      
-      // Convert to bytes immediately
-      const response = await fetch(dataURL);
-      const blob = await response.blob();
-      const buffer = await blob.arrayBuffer();
-      const bytes = new Uint8Array(buffer);
-
-      // Hide window to unblock view/interaction
-      await win.hide();
-
-      const { invoke } = await import('@tauri-apps/api/core');
-      const path = await invoke<string | null>('open_save_dialog');
-
-      if (path) {
-        // Save via Tauri command
-        await invoke('save_image', {
-          path,
-          imageData: Array.from(bytes) // camelCase maps to snake_case in Rust (image_data)
-        });
-        
-        // Show window briefly to show feedback? Or just close?
-        // User asked to "do action with folder", implies they might want to open it.
-        // For now, let's just show feedback then close.
-        await win.show(); // Show back up to display toast
-        setFeedback(`Saved to ${path}`);
-        setTimeout(handleClose, 1500); 
-      } else {
-        // User cancelled, show window again so they don't get lost
-        await win.show();
-      }
-    } catch (error) {
-      console.error('Failed to save:', error);
-      setFeedback('Failed to save image');
-      // Ensure window is back if error
-      await getCurrentWindow().show();
-    }
-  }, [exportCanvasAsDataURL, handleClose]);
-
-  const handleStick = useCallback(async () => {
-     if (!currentScreenshot) return;
-     const win = getCurrentWindow();
-     try {
-         await win.hide();
-         
-         const dataURL = exportCanvasAsDataURL();
-         
-         const { invoke } = await import('@tauri-apps/api/core');
-         // No need to save to disk, we pass the data URL directly
-         // path -> image_src
-         
-         const { x, y } = currentScreenshot.region;
-         const { width, height } = dimensions;
-         
-         await invoke('create_sticky_window', { 
-            imageSrc: dataURL,
-            x, y, width, height 
-         });
-         
-         // Close the main editor window (resetting for next capture)
-         handleClose();
-     } catch (e) {
-         console.error("Stick failed", e);
-         await win.show();
-     }
-  }, [currentScreenshot, dimensions, exportCanvasAsDataURL, handleClose]);
-
-  const handleGenerateAiCode = useCallback(
-    async (framework: AskFramework) => {
-      // Get current screen metrics to position the new window
-      const monitor = await currentMonitor();
-      if (!monitor) return;
-
-      const scaleFactor = monitor.scaleFactor;
-      const logicalWidth = monitor.size.width / scaleFactor;
-      // Center horizontally, near top properly
-      const width = 520;
-      const height = 620;
-      const margin = 24;
-      
-      // Position at Top-Right like the old stick behavior, or Centered?
-      // User said "refer stick function", which usually puts it where the user selected or a default place.
-      // Let's stick to Top-Right area for consistency with previous AI panel attempts.
-      const x = Math.max(margin, logicalWidth - width - margin);
-      const y = 60; // Top margin
-
-      const { invoke } = await import('@tauri-apps/api/core');
-      const dataURL = exportCanvasAsDataURL(); // Synchrnous usually? No, returns string? it's defined in component
-
-      if (dataURL) {
-        await invoke('create_ai_panel_window', {
-          imageSrc: dataURL,
-          framework,
-          x,
-          y,
-          width,
-          height
-        });
-
-        // Close the main editor overlay as we moved to a new window
-        handleClose();
-      }
-    },
-    [exportCanvasAsDataURL, handleClose]
-  );
+  // Screenshot actions hook
+  const { handleCopy, handleSave, handleStick, handleGenerateAiCode } = useScreenshotActions({
+    screenshot: currentScreenshot!,
+    width: dimensions.width,
+    height: dimensions.height,
+    onFeedback: setFeedback,
+    onClose: handleClose,
+  });
 
 
 
@@ -326,48 +123,19 @@ export function ScreenshotEditor() {
       />
 
       {/* Main Canvas Area */}
-      <div
-        className={`absolute overflow-hidden bg-transparent pointer-events-auto ${isPinned ? 'cursor-move' : 'shadow-2xl border border-gray-200'}`}
-        style={{ 
-          left: isPinned ? 0 : x,
-          top: isPinned ? 0 : y,
-          width: isPinned ? '100%' : dimensions.width, 
-          height: isPinned ? '100%' : dimensions.height,
-          borderRadius: isPinned ? 0 : '0.5rem'
-        }}
-        data-tauri-drag-region={isPinned ? "true" : undefined}
-      >
-        {isPinned && (
-             <div className="absolute top-2 right-2 z-50 flex gap-1 pointer-events-auto">
-                 <div className="px-2 py-1 bg-black/50 text-white text-[10px] rounded backdrop-blur-sm pointer-events-none select-none">
-                    Pinned
-                 </div>
-                 <button 
-                    onClick={handleClose}
-                    className="p-1 bg-black/50 hover:bg-red-500 text-white rounded-full transition-colors backdrop-blur-sm cursor-pointer"
-                    title="Close Pinned Window"
-                 >
-                    <X size={14} />
-                 </button>
-             </div>
-        )}
-        {currentScreenshot && (
-          <CanvasStage
-            imageUrl={currentScreenshot.imageData}
-            annotations={annotations}
-            width={dimensions.width}
-            height={dimensions.height}
-            currentTool={currentTool}
-            currentStyle={currentStyle}
-            onAddAnnotation={addAnnotation}
-            onUpdateAnnotation={updateAnnotation}
-          />
-        )}
-      </div>
+      {currentScreenshot && (
+        <ScreenshotCanvas
+          screenshot={currentScreenshot}
+          annotations={annotations}
+          currentTool={currentTool}
+          currentStyle={currentStyle}
+          onAddAnnotation={addAnnotation}
+          onUpdateAnnotation={updateAnnotation}
+        />
+      )}
 
-      {/* Annotation Toolbar - Only show if NOT pinned */}
-      {/* Annotation Toolbar & Sidebar - Only show if NOT pinned */}
-      {!isPinned && currentScreenshot && !editorHidden && (
+      {/* Annotation Toolbar */}
+      {currentScreenshot && (
         <>
           <div className="pointer-events-auto">
             <AnnotationToolbar
@@ -385,7 +153,6 @@ export function ScreenshotEditor() {
               onSave={handleSave}
               onStick={handleStick}
               onGenerateAiCode={handleGenerateAiCode}
-              isPinned={isPinned}
               onClose={handleClose}
               className="" // Override default positioning
               style={{
@@ -399,14 +166,8 @@ export function ScreenshotEditor() {
         </>
       )}
 
-      {/* Toast Feedback */}
-      {feedback && (
-        <div className="fixed top-10 left-1/2 transform -translate-x-1/2 z-[60] animate-in fade-in slide-in-from-top-4 duration-300">
-            <div className="bg-black/80 text-white px-6 py-3 rounded-full shadow-xl backdrop-blur-md flex items-center gap-2">
-                <span className="text-sm font-medium">{feedback}</span>
-            </div>
-        </div>
-      )}
+      {/* Feedback Toast */}
+      <ScreenshotFeedback message={feedback} />
 
       {showAskReact && (
         <AskReactPanel
@@ -415,9 +176,9 @@ export function ScreenshotEditor() {
           onClose={() => {
             setShowAskReact(false);
             setAskPanelImage(null);
-            
-            // Close window completely (like stick function)
-            void closeOverlayAndReset();
+
+            // Close window completely
+            void handleClose();
           }}
         />
       )}

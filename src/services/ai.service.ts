@@ -10,6 +10,7 @@ import type {
   AskFrameworkPromptResult,
   AskReactCodeResult,
   AskReactPromptResult,
+  OpenAIMessage,
 } from '../types/index';
 import {
   buildAskFrameworkAnalysisPrompt,
@@ -24,20 +25,38 @@ const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 const buildImageDataUrl = (imageBase64: string) =>
   imageBase64.startsWith('data:') ? imageBase64 : `data:image/png;base64,${imageBase64}`;
 
-export interface ChatMessage {
-  role: 'user' | 'assistant' | 'system';
-  content: string | Array<{ type: string; text?: string; image_url?: { url: string } }>;
-}
+/**
+ * Generic helper to call AI with image and text prompt
+ * Reduces boilerplate for multimodal requests
+ */
+async function callAiWithImage<T = string>(
+  imageBase64: string,
+  promptText: string,
+  parseResponse?: (raw: string) => T
+): Promise<T> {
+  const messages: OpenAIMessage[] = [
+    {
+      role: 'user',
+      content: [
+        { type: 'text', text: promptText },
+        { type: 'image_url', image_url: { url: buildImageDataUrl(imageBase64) } },
+      ],
+    },
+  ];
 
-export interface ChatResponse {
-  content: string;
-  error?: string;
+  const rawResponse = await callAiChat(messages);
+
+  if (parseResponse) {
+    return parseResponse(rawResponse);
+  }
+
+  return rawResponse as T;
 }
 
 /**
  * Call OpenAI API for chat completion
  */
-export async function callAiChat(messages: any[]): Promise<string> {
+export async function callAiChat(messages: OpenAIMessage[]): Promise<string> {
   // Ensure messages are in OpenAI format
   // The calling code already constructs OpenAI-compatible message arrays with text and image_url
 
@@ -86,7 +105,9 @@ function safeParseJson<T>(raw: string): T {
   try {
     return JSON.parse(cleaned) as T;
   } catch (err) {
-    console.warn("JSON Parse failed on:", cleaned);
+    if (import.meta.env.DEV) {
+      console.warn('[AI] JSON Parse failed on:', cleaned);
+    }
     throw new Error('Failed to parse JSON from AI response');
   }
 }
@@ -98,16 +119,7 @@ export async function chatWithScreenshot(
   imageBase64: string,
   userMessage: string
 ): Promise<string> {
-  const messages = [
-    {
-      role: 'user',
-      content: [
-        { type: 'text', text: userMessage },
-        { type: 'image_url', image_url: { url: buildImageDataUrl(imageBase64) } },
-      ],
-    },
-  ];
-  return callAiChat(messages);
+  return callAiWithImage(imageBase64, userMessage);
 }
 
 /**
@@ -119,15 +131,7 @@ export async function askFrameworkGeneratePrompt(
   userPrompt?: string
 ): Promise<AskFrameworkPromptResult> {
   const prompt = buildAskFrameworkAnalysisPrompt(framework, userPrompt);
-  const text = await callAiChat([
-    {
-      role: 'user',
-      content: [
-        { type: 'text', text: prompt },
-        { type: 'image_url', image_url: { url: buildImageDataUrl(imageBase64) } },
-      ],
-    },
-  ]);
+  const text = await callAiWithImage(imageBase64, prompt);
 
   return {
     framework,
@@ -147,36 +151,37 @@ export async function askFrameworkGenerateCode(
   const systemPrompt = buildAskFrameworkCodePrompt(framework);
   const combinedPrompt = `${systemPrompt}\n\nImage analysis:\n${preparedPrompt}`;
 
-  const text = await callAiChat([
-    {
-      role: 'user',
-      content: [
-        { type: 'text', text: combinedPrompt },
-        { type: 'image_url', image_url: { url: buildImageDataUrl(imageBase64) } },
-      ],
-    },
-  ]);
+  // Use the generic helper with custom parsing
+  const result = await callAiWithImage(
+    imageBase64,
+    combinedPrompt,
+    (raw) => {
+      const parsed = safeParseJson<AskFrameworkCodeResult>(raw);
 
-  const parsed = safeParseJson<AskFrameworkCodeResult>(text);
-  const defaultName: Record<AskFramework, string> = {
-    react: 'AskReactComponent',
-    vue: 'AskVueComponent',
-    flutter: 'AskFlutterWidget',
-  };
-  const defaultDescription: Record<AskFramework, string> = {
-    react: 'Generated React component',
-    vue: 'Generated Vue component',
-    flutter: 'Generated Flutter widget',
-  };
+      // Default values per framework
+      const defaultName: Record<AskFramework, string> = {
+        react: 'AskReactComponent',
+        vue: 'AskVueComponent',
+        flutter: 'AskFlutterWidget',
+      };
+      const defaultDescription: Record<AskFramework, string> = {
+        react: 'Generated React component',
+        vue: 'Generated Vue component',
+        flutter: 'Generated Flutter widget',
+      };
 
-  return {
-    framework,
-    name: parsed.name || defaultName[framework],
-    description: parsed.description || defaultDescription[framework],
-    code: parsed.code,
-    props: parsed.props,
-    styles: parsed.styles,
-  };
+      return {
+        framework,
+        name: parsed.name || defaultName[framework],
+        description: parsed.description || defaultDescription[framework],
+        code: parsed.code,
+        props: parsed.props,
+        styles: parsed.styles,
+      };
+    }
+  );
+
+  return result;
 }
 
 // Backwards compatibility for existing Ask React callers

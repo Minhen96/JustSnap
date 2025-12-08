@@ -1,8 +1,9 @@
 // JustSnap - Annotation Toolbar
 // Reference: use_case.md lines 68-90 (Screen Capture toolbar)
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import type { AnnotationTool, AskFramework } from '../../types';
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import {
   Pencil,
   Highlighter,
@@ -21,6 +22,7 @@ import {
   ScanText,
   Languages,
   FileCode,
+  ChevronRight,
 } from 'lucide-react';
 import { ColorPickerPopover } from './ColorPickerPopover';
 import { useAppStore } from '../../store/appStore';
@@ -43,7 +45,6 @@ interface AnnotationToolbarProps {
   onSave: () => void;
   onStick: () => void;
   onGenerateAiCode: (framework: AskFramework) => void;
-  isPinned?: boolean;
   onClose: () => void;
   style?: React.CSSProperties;
   className?: string;
@@ -64,47 +65,14 @@ export function AnnotationToolbar({
   onSave,
   onStick,
   onGenerateAiCode,
-  isPinned = false,
   onClose,
   style,
   className,
 }: AnnotationToolbarProps) {
-  const [showAiDropdown, setShowAiDropdown] = useState(false);
-  const hideAiDropdownTimeoutRef = useRef<number | null>(null);
-
-  const clearHideAiDropdownTimeout = () => {
-    if (hideAiDropdownTimeoutRef.current) {
-      window.clearTimeout(hideAiDropdownTimeoutRef.current);
-      hideAiDropdownTimeoutRef.current = null;
-    }
-  };
-
-  const scheduleHideAiDropdown = () => {
-    clearHideAiDropdownTimeout();
-    hideAiDropdownTimeoutRef.current = window.setTimeout(() => {
-      setShowAiDropdown(false);
-      hideAiDropdownTimeoutRef.current = null;
-    }, 450);
-  };
-
-  useEffect(() => () => clearHideAiDropdownTimeout(), []);
-
   const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
   const [showOCRPanel, setShowOCRPanel] = useState(false);
   const [showTranslationPanel, setShowTranslationPanel] = useState(false);
   const colorButtonRef = useRef<HTMLButtonElement>(null);
-  const dropdownContainerRef = useRef<HTMLDivElement>(null);
-  const [isNearBottom, setIsNearBottom] = useState(false);
-
-  // Check dropdown position on open or mount
-  useEffect(() => {
-    if (showAiDropdown && dropdownContainerRef.current) {
-        const rect = dropdownContainerRef.current.getBoundingClientRect();
-        const spaceBelow = window.innerHeight - rect.bottom;
-        // If less than 180px below, flip it up
-        setIsNearBottom(spaceBelow < 180);
-    }
-  }, [showAiDropdown]);
 
   // OCR State from store
   const ocrLoading = useAppStore((state) => state.ocrLoading);
@@ -140,11 +108,6 @@ export function AnnotationToolbar({
     },
     [currentTool, onToolChange]
   );
-
-  const handleFrameworkSelect = (framework: AskFramework) => {
-    setShowAiDropdown(false);
-    onGenerateAiCode(framework);
-  };
 
   return (
     <>
@@ -282,87 +245,63 @@ export function AnnotationToolbar({
               <ScanText size={20} />
             </button>
 
-            {/* Translation Button */}
+            {/* Translation Button - Now works without OCR, will auto-trigger it */}
             <button
               onClick={() => setShowTranslationPanel(true)}
-              disabled={!ocrResult || !ocrResult.text.trim()}
-              className={`
-                p-2 rounded-lg transition-all border
-                ${!ocrResult || !ocrResult.text.trim()
-                  ? 'bg-white text-gray-300 border-gray-200 cursor-not-allowed'
-                  : 'bg-white hover:bg-purple-50 text-gray-700 hover:text-purple-600 border-gray-300 hover:border-purple-300'
-                }
-              `}
-              title={!ocrResult ? 'Translate (Extract Text first)' : 'Translate Text'}
+              className="p-2 rounded-lg transition-all border bg-white hover:bg-purple-50 text-gray-700 hover:text-purple-600 border-gray-300 hover:border-purple-300"
+              title="Translate Text"
             >
               <Languages size={20} />
             </button>
-            
-            {/* Generate Code Button with Smart Dropdown */}
-            <div
-              className="relative"
-              onMouseEnter={clearHideAiDropdownTimeout}
-              onMouseLeave={scheduleHideAiDropdown}
-              ref={dropdownContainerRef}
-            >
-              <button
-                onClick={() => {
-                  clearHideAiDropdownTimeout();
-                  setTimeout(() => setShowAiDropdown((prev) => !prev), 100);
-                }}
-                className={`
-                    p-2 rounded-lg transition-all border flex items-center gap-1
-                    ${showAiDropdown 
-                        ? 'bg-blue-50 text-blue-600 border-blue-300' 
-                        : 'bg-white hover:bg-blue-50 text-gray-700 hover:text-blue-600 border-gray-300'
-                    }
-                `}
-                title="Generate UI Code"
-              >
-                <FileCode size={20} />
-              </button>
 
-              {showAiDropdown && (
-                <div 
-                    className={`
-                        absolute left-0 mt-1 bg-white rounded-lg shadow-xl border border-gray-200 min-w-[150px] overflow-hidden z-50
-                        ${isNearBottom ? 'bottom-full mb-2 top-auto' : 'top-full mt-1'}
-                    `}
+            {/* Generate Code Button with Radix UI Dropdown */}
+            <DropdownMenu.Root>
+              <DropdownMenu.Trigger asChild>
+                <button
+                  className="p-2 rounded-lg transition-all border bg-white hover:bg-blue-50 text-gray-700 hover:text-blue-600 border-gray-300 data-[state=open]:bg-blue-50 data-[state=open]:text-blue-600 data-[state=open]:border-blue-300"
+                  title="Generate UI Code"
                 >
-                  <div className="px-3 py-2 bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  <FileCode size={20} />
+                </button>
+              </DropdownMenu.Trigger>
+
+              <DropdownMenu.Portal>
+                <DropdownMenu.Content
+                  className="min-w-[150px] bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden z-[60] animate-in fade-in-0 zoom-in-95 data-[side=top]:slide-in-from-bottom-2 data-[side=bottom]:slide-in-from-top-2"
+                  sideOffset={5}
+                  align="start"
+                >
+                  <DropdownMenu.Label className="px-3 py-2 bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wider">
                     Generate Code
-                  </div>
+                  </DropdownMenu.Label>
+
                   {(['react', 'vue', 'flutter'] as AskFramework[]).map((fw) => (
-                    <button
+                    <DropdownMenu.Item
                       key={fw}
-                      onClick={() => handleFrameworkSelect(fw)}
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 text-gray-700 hover:text-blue-700 transition-colors flex items-center justify-between group"
+                      onClick={() => onGenerateAiCode(fw)}
+                      className="px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 outline-none cursor-pointer transition-colors flex items-center justify-between group"
                     >
                       <span>
                         {fw === 'react' && 'React'}
                         {fw === 'vue' && 'Vue'}
                         {fw === 'flutter' && 'Flutter'}
                       </span>
-                      <ArrowRight size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </button>
+                      <ChevronRight size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </DropdownMenu.Item>
                   ))}
-                </div>
-              )}
-            </div>
+                </DropdownMenu.Content>
+              </DropdownMenu.Portal>
+            </DropdownMenu.Root>
           </div>
 
           {/* Actions */}
           <div className="flex items-center gap-1">
             <button
               onClick={onStick}
-              className={`p-2 rounded-lg border transition-all ${
-                isPinned 
-                  ? 'bg-orange-100 text-orange-600 border-orange-300' 
-                  : 'bg-white hover:bg-orange-100 text-orange-600 border-orange-300'
-              }`}
-              title={isPinned ? "Unpin" : "Pin Screenshot"}
+              className="p-2 rounded-lg border transition-all bg-white hover:bg-orange-100 text-orange-600 border-orange-300"
+              title="Pin Screenshot"
             >
-              <Pin size={20} className={isPinned ? "fill-current" : ""} />
+              <Pin size={20} />
             </button>
             <button
               onClick={onCopy}

@@ -2,11 +2,12 @@
 // Dedicated flow: generate prompt from snip -> generate framework-specific code JSON -> download/copy
 
 import { useEffect, useState } from 'react';
-import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useAskReact } from '../../hooks/useAskReact';
-import { exportText, generateFileName } from '../../utils/file';
 import type { AskFramework } from '../../types';
-import { X } from 'lucide-react';
+import { AIPanelHeader } from './AIPanelHeader';
+import { ScreenshotPreview } from './ScreenshotPreview';
+import { CodeOutput } from './CodeOutput';
+import { AIPanelResizeHandle } from './AIPanelResizeHandle';
 
 interface AskReactPanelProps {
   screenshot: string; // base64 or object URL
@@ -21,7 +22,6 @@ export function AskReactPanel({
 }: AskReactPanelProps) {
   const [framework, setFramework] = useState<AskFramework>(initialFramework);
   const [userPrompt, setUserPrompt] = useState('');
-  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
 
   const {
     generatedPrompt,
@@ -35,7 +35,6 @@ export function AskReactPanel({
   } = useAskReact(screenshot, framework);
 
   useEffect(() => {
-    setCopyState('idle');
     reset();
   }, [framework, reset]);
 
@@ -49,124 +48,44 @@ export function AskReactPanel({
     flutter: 'Flutter',
   };
 
-  const handleCopy = async () => {
-    if (!codeResult?.code) return;
-    try {
-      await navigator.clipboard.writeText(codeResult.code);
-      setCopyState('copied');
-    } catch (err) {
-      console.error('Copy failed', err);
-      setCopyState('error');
-    }
-  };
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const handleDownload = () => {
-    if (!codeResult) return;
-    const fileName = generateFileName(`ask-${framework}`);
-    const propsText = codeResult.props
-      ? Object.entries(codeResult.props)
-          .map(([key, val]) => `- ${key}: ${val}`)
-          .join('\n')
-      : 'None';
-
-    const fileContent = [
-      `Ask ${frameworkLabels[framework]} Result: ${codeResult.name}`,
-      '',
-      `Description: ${codeResult.description}`,
-      '',
-      `Framework: ${frameworkLabels[framework]}`,
-      '',
-      `Image analysis used: ${generatedPrompt?.prompt || 'N/A'}`,
-      '',
-      'Props:',
-      propsText,
-      '',
-      'Styles:',
-      codeResult.styles || 'None',
-      '',
-      'Code:',
-      codeResult.code,
-    ].join('\n');
-
-    exportText(fileContent, fileName, 'txt');
-  };
-
   // Auto-run code generation when panel opens
   useEffect(() => {
     // Only run once when component mounts or when framework/screenshot changes
     if (isPromptLoading || isCodeLoading || codeResult) return;
-    
+
     const runGeneration = async () => {
-      setCopyState('idle');
       // Step 1: Generate prompt
       const promptResult = await generatePrompt(userPrompt.trim() || undefined);
       if (!promptResult) return;
-      
+
       // Step 2: Generate code immediately after prompt
       await generateCode(promptResult.prompt);
     };
-    
+
     void runGeneration();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [framework, screenshot]); // Only re-run when framework or screenshot changes
 
   const handleRegenerate = async () => {
-    setCopyState('idle');
     reset();
-    
+
     // Step 1: Generate prompt
     const promptResult = await generatePrompt(userPrompt.trim() || undefined);
     if (!promptResult) return;
-    
-    await generateCode(promptResult.prompt);
-  };
 
-  const handleResizeStart = () => {
-    // @ts-expect-error - startResizing is available in Tauri v2 but typings might be missing
-    getCurrentWindow().startResizing('BottomRight');
+    await generateCode(promptResult.prompt);
   };
 
   return (
     <div className="fixed inset-0 bg-white rounded-xl shadow-2xl border border-gray-100 z-50 flex flex-col pointer-events-auto overflow-hidden">
-      {/* Header - Draggable Area */}
-      <div 
-        data-tauri-drag-region
-        className="h-10 bg-gray-50 border-b flex items-center justify-between px-4 select-none cursor-grab active:cursor-grabbing"
-      >
-        <div className="flex items-center gap-2 pointer-events-none">
-          <div className="font-semibold text-sm text-gray-700">
-            Generate {frameworkLabels[framework]} UI code
-          </div>
-        </div>
-        
-        <div className="flex items-center gap-2">
-          <div className="text-xs text-gray-400 mr-2 pointer-events-none">
-            Autosaved to desktop
-          </div>
-          {/* Close button - Ensure it sits above drag region */}
-          <button 
-            onClick={onClose}
-            className="p-1 hover:bg-gray-200 rounded text-gray-500 hover:text-gray-700 transition-colors z-50 cursor-pointer relative"
-            title="Close"
-          >
-            <X size={18} />
-          </button>
-        </div>
-      </div>
+      <AIPanelHeader
+        title={`Generate ${frameworkLabels[framework]} UI code`}
+        subtitle="Autosaved to desktop"
+        onClose={onClose}
+      />
 
       <div className="p-4 space-y-4 overflow-y-auto flex-1 min-h-0">
-        {/* Preview */}
-        <div className="relative rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
-          <img
-            src={screenshot}
-            alt="Captured screenshot preview"
-            className="w-full h-40 object-contain bg-white"
-          />
-          <div className="absolute bottom-2 right-2 text-[11px] bg-black/70 text-white px-2 py-1 rounded-full">
-            Snip attached
-          </div>
-        </div>
+        <ScreenshotPreview screenshot={screenshot} />
 
         {/* Optional guidance - Full width */}
         <div>
@@ -204,35 +123,7 @@ export function AskReactPanel({
 
         {/* Code Output */}
         {codeResult && (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">
-                  {frameworkLabels[framework]} result
-                </p>
-                <h4 className="text-base font-semibold text-gray-900">{codeResult.name}</h4>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleCopy}
-                  className="px-3 py-1.5 rounded-md bg-gray-100 text-gray-800 text-sm hover:bg-gray-200"
-                >
-                  {copyState === 'copied' ? 'Copied ✓' : 'Copy code'}
-                </button>
-              </div>
-            </div>
-
-            <div className="border border-gray-200 rounded-lg bg-gray-50">
-              <pre className="overflow-auto p-3 text-sm text-gray-900 whitespace-pre-wrap max-h-[400px]">{codeResult.code}</pre>
-            </div>
-
-            {codeResult.styles && (
-              <div className="border border-gray-200 rounded-lg bg-white p-3 text-sm text-gray-800">
-                <p className="font-semibold mb-1">Styles</p>
-                <pre className="whitespace-pre-wrap max-h-[200px] overflow-auto">{codeResult.styles}</pre>
-              </div>
-            )}
-          </div>
+          <CodeOutput codeResult={codeResult} frameworkLabel={frameworkLabels[framework]} />
         )}
 
         {/* Error State */}
@@ -242,17 +133,8 @@ export function AskReactPanel({
           </div>
         )}
       </div>
-      
-      {/* Resize Handle (Bottom Right) */}
-      <div 
-        onMouseDown={handleResizeStart}
-        className="absolute bottom-0 right-0 p-1 cursor-se-resize z-50 text-gray-400 hover:text-gray-600"
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-           <path d="M21 15l-6 6" />
-           <path d="M21 9l-12 12" />
-        </svg>
-      </div>
+
+      <AIPanelResizeHandle />
     </div>
   );
 }

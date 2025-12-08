@@ -1,7 +1,7 @@
 // JustSnap IPC Service - Tauri Command Wrapper
 // Provides type-safe communication between React and Rust
 
-import { invoke } from '@tauri-apps/api/tauri';
+import { invoke } from '@tauri-apps/api/core';
 import type {
   TauriCaptureRequest,
   TauriCaptureResponse,
@@ -93,6 +93,52 @@ export async function copyImageToClipboard(imageData: Uint8Array): Promise<void>
 
 export async function copyTextToClipboard(text: string): Promise<void> {
   await invoke('copy_text_to_clipboard', { text });
+}
+
+export async function saveTempImage(imageData: Uint8Array): Promise<string> {
+  const path = await invoke<string>('save_temp_image', {
+    imageData: Array.from(imageData),
+  });
+  return path;
+}
+
+/**
+ * Multi-Window Commands
+ */
+
+export async function createStickyWindow(
+  imageSrc: string,
+  x: number,
+  y: number,
+  width: number,
+  height: number
+): Promise<void> {
+  await invoke('create_sticky_window', { imageSrc, x, y, width, height });
+}
+
+export async function createAIPanelWindow(
+  imageSrc: string,
+  framework: string,
+  x: number,
+  y: number,
+  width: number,
+  height: number
+): Promise<void> {
+  await invoke('create_ai_panel_window', { imageSrc, framework, x, y, width, height });
+}
+
+export async function createTranslationWindow(
+  text: string,
+  x: number,
+  y: number
+): Promise<void> {
+  await invoke('create_translation_window', { text, x, y });
+}
+
+export async function closeWindow(): Promise<void> {
+  const { getCurrentWindow } = await import('@tauri-apps/api/window');
+  const window = getCurrentWindow();
+  await invoke('close_window', { window });
 }
 
 /**

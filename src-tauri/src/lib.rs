@@ -41,12 +41,10 @@ pub fn run() {
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "quit" => {
-                        println!("Tray: Quit requested");
                         app.exit(0);
                     }
                     "show" => {
                         if let Some(window) = app.get_webview_window("main") {
-                            println!("Tray: Showing window");
                             let _ = window.show();
                             let _ = window.set_focus();
                             let _ = window.unminimize();
@@ -80,9 +78,9 @@ pub fn run() {
 
             // Register default hotkey (Ctrl+Shift+S) on startup
             if let Err(e) = hotkeys::register_default_hotkey(&app.handle()) {
-                eprintln!("Failed to register default hotkey: {}", e);
-            } else {
-                println!("✓ Global hotkey (Ctrl+Shift+S) registered successfully!");
+                eprintln!("[Error] Failed to register default hotkey: {}", e);
+            } else if cfg!(debug_assertions) {
+                println!("[Hotkey] ✓ Global hotkey (Ctrl+Shift+S) registered");
             }
 
             Ok(())

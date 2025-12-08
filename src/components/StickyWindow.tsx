@@ -133,11 +133,26 @@ export function StickyWindow() {
           const bytes = new Uint8Array(buffer);
 
           const win = getCurrentWindow();
-          // Hide briefly to interact with dialog? No, dialog is separate window usually. 
-          // Actually, save dialog is native, it might block.
-          // Tauri open_save_dialog is async.
           
+          // CRITICAL: To make the Native Save Dialog appear on top, 
+          // we must temporarily disable AlwaysOnTop if it's enabled.
+          // Otherwise the dialog might open *behind* this window.
+          const wasPinned = isPinned;
+          if (wasPinned) {
+              await win.setAlwaysOnTop(false);
+          }
+
+          // Force focus to the window so the dialog spawns correctly
+          await win.setFocus();
+
+          // Open dialog (this awaits until user picks file or cancels)
           const path = await invoke<string | null>('open_save_dialog');
+          
+          // Restore pinned state immediately
+          if (wasPinned) {
+              await win.setAlwaysOnTop(true);
+          }
+
           if (path) {
               await invoke('save_image', {
                   path,
@@ -227,7 +242,7 @@ export function StickyWindow() {
         {/* Resize Handle - Only visible on hover */}
         {isHovered && (
              <div 
-                className="absolute bottom-0 right-0 p-1 cursor-se-resize z-50 text-white/80 hover:text-white drop-shadow-md"
+                className="absolute bottom-0 right-0 p-1 z-50 text-white/80 hover:text-white drop-shadow-md pointer-events-none"
             >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M21 15l-6 6" />

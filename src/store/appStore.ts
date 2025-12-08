@@ -81,6 +81,10 @@ interface AppState {
   setTranslationResult: (result: TranslationResult) => void;
   setTranslationError: (error: string | null) => void;
   clearTranslation: () => void;
+
+  // Helper actions - State reset
+  resetAIState: () => void;
+  resetEditorState: () => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -114,30 +118,24 @@ export const useAppStore = create<AppState>((set) => ({
 
   // Overlay actions
   showOverlay: (mode = 'capture') =>
-    set({
-      isOverlayActive: true,
-      currentMode: mode,
-      selectedRegion: null,
-      isSelecting: false,
-      showToolbar: false,
-      currentScreenshot: null, // Clear previous screenshot to prevent editor overlap
-      ocrResult: null, // Clear previous OCR results
-      ocrLoading: false,
-      ocrProgress: 0,
-      ocrError: null,
-      translationResult: null, // Clear previous translation results
-      translationLoading: false,
-      translationError: null,
+    set((state) => {
+      state.resetAIState();
+      return {
+        isOverlayActive: true,
+        currentMode: mode,
+        selectedRegion: null,
+        isSelecting: false,
+        showToolbar: false,
+        currentScreenshot: null, // Clear previous screenshot to prevent editor overlap
+      };
     }),
 
   hideOverlay: async () => {
     // Call backend to minimize/hide window
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const isTauri = !!(window as any).__TAURI_INTERNALS__ || '__TAURI__' in window;
+      const isTauri = !!window.__TAURI_INTERNALS__ || '__TAURI__' in window;
 
       if (isTauri) {
-        console.log('Calling hide_overlay command...');
         const { invoke } = await import('@tauri-apps/api/core');
         const { getCurrentWindow } = await import('@tauri-apps/api/window');
 
@@ -146,9 +144,6 @@ export const useAppStore = create<AppState>((set) => ({
 
         // Also call backend command if needed for other cleanup
         await invoke('hide_overlay');
-        console.log('hide_overlay command executed');
-      } else {
-        console.log('Not in Tauri, skipping hide_overlay');
       }
     } catch (e) {
       console.error('Failed to hide overlay window:', e);
@@ -156,16 +151,14 @@ export const useAppStore = create<AppState>((set) => ({
 
 
 
-    set({
-      isOverlayActive: false,
-      selectedRegion: null,
-      isSelecting: false,
-      showToolbar: false,
-      currentScreenshot: null,
-      annotations: [],
-      annotationHistory: [[]],
-      annotationHistoryStep: 0,
-      currentTool: 'rectangle',
+    set((state) => {
+      state.resetEditorState();
+      return {
+        isOverlayActive: false,
+        selectedRegion: null,
+        isSelecting: false,
+        showToolbar: false,
+      };
     });
   },
 
@@ -197,19 +190,10 @@ export const useAppStore = create<AppState>((set) => ({
     }),
 
   clearScreenshot: () =>
-    set({
-      currentScreenshot: null,
-      annotations: [],
-      annotationHistory: [[]],
-      annotationHistoryStep: 0,
-      currentTool: 'rectangle',
-      ocrResult: null,
-      ocrLoading: false,
-      ocrProgress: 0,
-      ocrError: null,
-      translationResult: null,
-      translationLoading: false,
-      translationError: null,
+    set((state) => {
+      state.resetAIState();
+      state.resetEditorState();
+      return {};
     }),
 
   addToHistory: (screenshot) =>
@@ -302,6 +286,27 @@ export const useAppStore = create<AppState>((set) => ({
     set({ translationError: error, translationLoading: false }),
   clearTranslation: () =>
     set({ translationResult: null, translationLoading: false, translationError: null }),
+
+  // Helper actions - State reset
+  resetAIState: () =>
+    set({
+      ocrResult: null,
+      ocrLoading: false,
+      ocrProgress: 0,
+      ocrError: null,
+      translationResult: null,
+      translationLoading: false,
+      translationError: null,
+    }),
+
+  resetEditorState: () =>
+    set({
+      currentScreenshot: null,
+      annotations: [],
+      annotationHistory: [[]],
+      annotationHistoryStep: 0,
+      currentTool: 'rectangle',
+    }),
 }));
 
 // Selectors for common state combinations

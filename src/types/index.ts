@@ -97,6 +97,28 @@ export interface AISummary {
   timestamp: number;
 }
 
+// OpenAI API message types
+export type OpenAIMessageRole = 'user' | 'assistant' | 'system';
+
+export interface OpenAITextContent {
+  type: 'text';
+  text: string;
+}
+
+export interface OpenAIImageContent {
+  type: 'image_url';
+  image_url: {
+    url: string;
+  };
+}
+
+export type OpenAIMessageContent = string | Array<OpenAITextContent | OpenAIImageContent>;
+
+export interface OpenAIMessage {
+  role: OpenAIMessageRole;
+  content: OpenAIMessageContent;
+}
+
 // Unified framework type for all AI code generation features
 export type CodeFramework = 'react' | 'vue' | 'flutter' | 'html' | 'nextjs';
 

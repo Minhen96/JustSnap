@@ -16,21 +16,39 @@ function Root() {
   useEffect(() => {
     const detectWindowType = async () => {
       try {
-        const win = getCurrentWindow();
-        const label = win.label;
+        // Try to get window type from injected variable first (more reliable)
+        const injectedType = window.__WINDOW_TYPE__;
 
-        console.log('[Main] Window label:', label);
-
-        // Detect window type based on label prefix
-        if (label.startsWith('sticky')) {
-          setWindowType('sticky');
-        } else if (label.startsWith('ai_panel')) {
-          setWindowType('ai_panel');
-        } else if (label.startsWith('translation')) {
-          setWindowType('translation_panel');
+        if (injectedType) {
+          if (import.meta.env.DEV) {
+            console.log('[Main] Window type (injected):', injectedType);
+          }
+          // Map injected type to component type
+          if (injectedType === 'translation') {
+            setWindowType('translation_panel');
+          } else {
+            setWindowType(injectedType);
+          }
         } else {
-          // Default to main app (label is 'main')
-          setWindowType('app');
+          // Fallback: detect from window label (for main window)
+          const win = getCurrentWindow();
+          const label = win.label;
+
+          if (import.meta.env.DEV) {
+            console.log('[Main] Window label (fallback):', label);
+          }
+
+          // Detect window type based on label prefix
+          if (label.startsWith('sticky')) {
+            setWindowType('sticky');
+          } else if (label.startsWith('ai_panel')) {
+            setWindowType('ai_panel');
+          } else if (label.startsWith('translation')) {
+            setWindowType('translation_panel');
+          } else {
+            // Default to main app (label is 'main')
+            setWindowType('app');
+          }
         }
       } catch (e) {
         console.error('[Main] Window detection failed:', e);

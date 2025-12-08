@@ -23,7 +23,9 @@ pub fn register_global_hotkey(app: &AppHandle, hotkey: Hotkey) -> Result<(), Str
     }
     shortcut_str.push_str(&hotkey.key);
 
-    println!("Registering global hotkey: {}", shortcut_str);
+    if cfg!(debug_assertions) {
+        println!("[Hotkey] Registering: {}", shortcut_str);
+    }
 
     // Parse the shortcut
     let shortcut: Shortcut = shortcut_str
@@ -37,8 +39,6 @@ pub fn register_global_hotkey(app: &AppHandle, hotkey: Hotkey) -> Result<(), Str
     app.global_shortcut()
         .on_shortcut(shortcut, move |_app, _shortcut, event| {
             if event.state == ShortcutState::Pressed {
-                println!("Global hotkey triggered!");
-
                 // 1. Hide window to capture clean screen
                 if let Some(window) = app_handle.get_webview_window("main") {
                     let _ = window.hide();
@@ -47,7 +47,6 @@ pub fn register_global_hotkey(app: &AppHandle, hotkey: Hotkey) -> Result<(), Str
                 // Give the OS a moment to repaint the background
                 std::thread::sleep(std::time::Duration::from_millis(10));
 
-                println!("Starting screen capture (RAW)...");
                 // Captured raw image (fast)
                 let capture_result = tauri::async_runtime::block_on(async {
                     crate::screen_capture::capture_full_screen_raw().await
@@ -55,15 +54,8 @@ pub fn register_global_hotkey(app: &AppHandle, hotkey: Hotkey) -> Result<(), Str
 
                 match capture_result {
                     Ok(raw_image) => {
-                        println!(
-                            "Screen captured (RAW). Size: {}x{}",
-                            raw_image.width(),
-                            raw_image.height()
-                        );
-
                         // 2. SHOW WINDOW IMMEDIATELY (Optimistic)
                         if let Some(window) = app_handle.get_webview_window("main") {
-                            println!("Setting window to overlay mode (OPTIMISTIC)...");
 
                             // Basic window setup
                             let _ = window.set_decorations(false);
@@ -101,7 +93,6 @@ pub fn register_global_hotkey(app: &AppHandle, hotkey: Hotkey) -> Result<(), Str
                         // Using JPEG for speed to minimize the "Jump" delay
                         let app_handle_clone = app_handle.clone();
                         tauri::async_runtime::spawn(async move {
-                            println!("Encoding image (JPEG) in background...");
                             let mut buffer = Cursor::new(Vec::new());
 
                             // Convert RGBA to RGB (JPEG doesn't support Alpha)
@@ -128,16 +119,15 @@ pub fn register_global_hotkey(app: &AppHandle, hotkey: Hotkey) -> Result<(), Str
                             // Encode to Base64
                             let base64_image = BASE64_STANDARD.encode(&image_data);
 
-                            println!("Image encoded. Sending to frontend...");
                             if let Err(e) =
                                 app_handle_clone.emit("screen-capture-ready", base64_image)
                             {
-                                eprintln!("Failed to emit screen capture event: {}", e);
+                                eprintln!("[Error] Failed to emit screen capture event: {}", e);
                             }
                         });
                     }
                     Err(e) => {
-                        eprintln!("Failed to capture screen: {}", e);
+                        eprintln!("[Error] Failed to capture screen: {}", e);
                         // If capture failed, we should probably still show window or show error
                         let _ = app_handle.emit("capture-debug", format!("Capture failed: {}", e));
                     }
@@ -151,7 +141,9 @@ pub fn register_global_hotkey(app: &AppHandle, hotkey: Hotkey) -> Result<(), Str
 
 /// Unregister all global hotkeys
 pub fn unregister_global_hotkey(app: &AppHandle) -> Result<(), String> {
-    println!("Unregistering all global hotkeys");
+    if cfg!(debug_assertions) {
+        println!("[Hotkey] Unregistering all global hotkeys");
+    }
 
     app.global_shortcut()
         .unregister_all()

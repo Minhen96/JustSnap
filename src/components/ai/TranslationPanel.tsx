@@ -1,10 +1,11 @@
 // JustSnap - Translation Panel
 // Reference: use_case.md line 80, tech_stack.md line 96
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Copy, Languages, Loader2 } from 'lucide-react';
 import { useAppStore } from '../../store/appStore';
 import { translateText, type TranslationLanguage } from '../../services/translation.service';
+import { extractText } from '../../services/ocr.service';
 
 interface TranslationPanelProps {
   onClose: () => void;
@@ -17,17 +18,48 @@ const LANGUAGES: { code: TranslationLanguage; name: string; flag: string }[] = [
 ];
 
 export function TranslationPanel({ onClose }: TranslationPanelProps) {
+  const currentScreenshot = useAppStore((state) => state.currentScreenshot);
   const ocrResult = useAppStore((state) => state.ocrResult);
+  const ocrLoading = useAppStore((state) => state.ocrLoading);
 
   const translationResult = useAppStore((state) => state.translationResult);
   const translationLoading = useAppStore((state) => state.translationLoading);
   const translationError = useAppStore((state) => state.translationError);
+
+  const setOCRLoading = useAppStore((state) => state.setOCRLoading);
+  const setOCRProgress = useAppStore((state) => state.setOCRProgress);
+  const setOCRResult = useAppStore((state) => state.setOCRResult);
+  const setOCRError = useAppStore((state) => state.setOCRError);
+
   const setTranslationLoading = useAppStore((state) => state.setTranslationLoading);
   const setTranslationResult = useAppStore((state) => state.setTranslationResult);
   const setTranslationError = useAppStore((state) => state.setTranslationError);
 
   const [selectedLanguage, setSelectedLanguage] = useState<TranslationLanguage>('en');
   const [copied, setCopied] = useState(false);
+
+  // Auto-trigger OCR if no text is available
+  useEffect(() => {
+    const runOCRIfNeeded = async () => {
+      // If we have no OCR result and we're not already loading, run OCR
+      if (!ocrResult && !ocrLoading && currentScreenshot?.imageData) {
+        setOCRLoading(true);
+        setOCRError(null);
+
+        try {
+          const result = await extractText(
+            currentScreenshot.imageData,
+            (progress) => setOCRProgress(progress)
+          );
+          setOCRResult(result);
+        } catch (error) {
+          setOCRError(error instanceof Error ? error.message : 'OCR failed');
+        }
+      }
+    };
+
+    runOCRIfNeeded();
+  }, [ocrResult, ocrLoading, currentScreenshot, setOCRLoading, setOCRProgress, setOCRResult, setOCRError]);
 
   const handleTranslate = async () => {
     if (!ocrResult?.text) {
@@ -77,7 +109,15 @@ export function TranslationPanel({ onClose }: TranslationPanelProps) {
 
         {/* Content */}
         <div className="p-4 space-y-3 flex-1 overflow-y-auto">
-          {!hasText ? (
+          {/* Show OCR loading state */}
+          {ocrLoading && !ocrResult && (
+            <div className="text-center py-8">
+              <Loader2 className="animate-spin mx-auto text-purple-600 mb-2" size={32} />
+              <p className="text-sm text-gray-600">Extracting text from image...</p>
+            </div>
+          )}
+
+          {!hasText && !ocrLoading ? (
             <p className="text-sm text-yellow-700 bg-yellow-50 border border-yellow-200 rounded p-2">
               No text to translate.
             </p>
