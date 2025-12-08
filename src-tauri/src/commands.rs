@@ -386,7 +386,7 @@ pub async fn create_ai_panel_window(
         image_src, framework
     );
 
-    let _ = WebviewWindowBuilder::new(&app, &label, WebviewUrl::App("index.html#ai_panel".into()))
+    let _ = WebviewWindowBuilder::new(&app, &label, WebviewUrl::App("index.html".into()))
         .title("JustSnap AI Code")
         .decorations(false) // Frameless for custom UI
         .resizable(true) // Start resizable for dragging
@@ -423,7 +423,7 @@ pub async fn create_translation_window(
     let _ = WebviewWindowBuilder::new(
         &app,
         &label,
-        WebviewUrl::App("index.html#translation_panel".into()),
+        WebviewUrl::App("index.html".into()),
     )
     .title("JustSnap Translate")
     .decorations(false) // Frameless

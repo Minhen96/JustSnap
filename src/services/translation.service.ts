@@ -1,16 +1,11 @@
 // JustSnap - Translation Service (OpenAI)
 // Reference: tech_stack.md lines 96, use_case.md line 80
 
+import type { TranslationResult } from '../types';
+
 const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY || '';
 
 export type TranslationLanguage = 'en' | 'zh' | 'ms'; // English, Chinese, Malay
-
-export interface TranslationResult {
-  translatedText: string;
-  detectedSourceLanguage: string; // e.g., "English", "Chinese", "Malay"
-  targetLanguage: TranslationLanguage;
-  sourceText: string;
-}
 
 /**
  * Translate text using OpenAI with auto-detection of source language

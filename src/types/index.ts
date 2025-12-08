@@ -97,15 +97,19 @@ export interface AISummary {
   timestamp: number;
 }
 
+// Unified framework type for all AI code generation features
+export type CodeFramework = 'react' | 'vue' | 'flutter' | 'html' | 'nextjs';
+
+// Subset used by Ask feature (currently supports these 3)
+export type AskFramework = 'react' | 'vue' | 'flutter';
+
 export interface AICodeGeneration {
-  framework: 'react' | 'vue' | 'flutter' | 'html' | 'nextjs';
+  framework: CodeFramework;
   code: string;
   styles?: string;
   dependencies?: string[];
   fileName: string;
 }
-
-export type AskFramework = 'react' | 'vue' | 'flutter';
 
 export interface AskFrameworkPromptResult {
   framework: AskFramework;

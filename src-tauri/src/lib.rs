@@ -1,6 +1,6 @@
 // JustSnap - Tauri Backend Library
 
-// Module declarations
+// Module declarations (Rust will find the files in the src directory)
 mod commands;
 mod hotkeys;
 mod screen_capture;
@@ -9,9 +9,13 @@ mod utils;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // Allows registering hotkeys like Ctrl+Shift+S and listening globally.
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        // Allows opening file dialogs for saving images and text.
         .plugin(tauri_plugin_dialog::init())
+        // Run the code here before the app window is created.
         .setup(|app| {
+            // Debug logging. (Only enabled in debug mode)
             if cfg!(debug_assertions) {
                 app.handle().plugin(
                     tauri_plugin_log::Builder::default()
@@ -25,10 +29,12 @@ pub fn run() {
             use tauri::tray::TrayIconBuilder;
             use tauri::Manager;
 
+            // Create menu items for the system tray.
             let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
             let show_i = MenuItem::with_id(app, "show", "Show", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show_i, &quit_i])?;
 
+            // Create a tray icon for the system tray.
             let _tray = TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())
                 .menu(&menu)
@@ -49,6 +55,7 @@ pub fn run() {
                     }
                     _ => {}
                 })
+                // Handle tray icon events.
                 .on_tray_icon_event(|tray, event| {
                     if let tauri::tray::TrayIconEvent::Click {
                         button: tauri::tray::MouseButton::Left,
@@ -80,6 +87,7 @@ pub fn run() {
 
             Ok(())
         })
+        // Handle invocations from the frontend.
         .invoke_handler(tauri::generate_handler![
             // Screen Capture
             commands::capture_screen,

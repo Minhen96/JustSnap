@@ -7,60 +7,50 @@ import { AIPanelWindow } from './components/AIPanelWindow.tsx'
 import { TranslationWindow } from './components/TranslationWindow.tsx'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 
+type WindowType = 'app' | 'sticky' | 'ai_panel' | 'translation_panel';
+
 function Root() {
-  const [windowType, setWindowType] = useState(() => {
-      try {
-        if (window.location.hash === '#ai_panel') return 'ai_panel';
-        if (window.location.hash === '#translation_panel') return 'translation_panel';
-
-        const params = new URLSearchParams(window.location.search);
-        if (params.get('window') === 'ai_panel') return 'ai_panel';
-        if (params.get('window') === 'translation_panel') return 'translation_panel';
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        if ((window as any).__AI_PANEL_DATA__) return 'ai_panel';
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        if ((window as any).__TRANSLATION_TEXT__) return 'translation_panel';
-      } catch(e) { console.error(e); }
-      return 'app';
-  });
-
-  const [isSticky, setIsSticky] = useState(false);
-  const [ready, setReady] = useState(windowType !== 'app'); // Ready if known special window
+  const [windowType, setWindowType] = useState<WindowType>('app');
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-     if (windowType !== 'app') return; // Already identified
+    const detectWindowType = async () => {
+      try {
+        const win = getCurrentWindow();
+        const label = win.label;
 
-     const checkLabel = async () => {
-         try {
-             const win = getCurrentWindow();
-             const label = win.label;
-             
-             // Check sticky
-             if (label.startsWith('sticky')) {
-                 setIsSticky(true);
-             } 
-             // Fallback label checks
-             else if (label.startsWith('ai_panel')) {
-                 setWindowType('ai_panel');
-             }
-             else if (label.startsWith('translation')) {
-                 setWindowType('translation_panel');
-             }
-         } catch (e) {
-             console.error("Window check failed", e);
-         } finally {
-             setReady(true);
-         }
-     };
-     checkLabel();
-  }, [windowType]);
+        console.log('[Main] Window label:', label);
 
+        // Detect window type based on label prefix
+        if (label.startsWith('sticky')) {
+          setWindowType('sticky');
+        } else if (label.startsWith('ai_panel')) {
+          setWindowType('ai_panel');
+        } else if (label.startsWith('translation')) {
+          setWindowType('translation_panel');
+        } else {
+          // Default to main app (label is 'main')
+          setWindowType('app');
+        }
+      } catch (e) {
+        console.error('[Main] Window detection failed:', e);
+        // Fallback to app on error
+        setWindowType('app');
+      } finally {
+        setReady(true);
+      }
+    };
+
+    detectWindowType();
+  }, []);
+
+  // Don't render until we know what type of window this is
+  if (!ready) return null;
+
+  // Render appropriate component based on window type
   if (windowType === 'ai_panel') return <AIPanelWindow />;
   if (windowType === 'translation_panel') return <TranslationWindow />;
-  
-  if (!ready) return null; // Render nothing while checking (or transparent)
-  if (isSticky) return <StickyWindow />;
+  if (windowType === 'sticky') return <StickyWindow />;
 
   return <App />;
 }
