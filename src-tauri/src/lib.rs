@@ -111,6 +111,7 @@ pub fn run() {
             commands::close_window,
             commands::get_windows,
             commands::get_window_at_point,
+            commands::get_cursor_position,
         ])
         // generate_context!() : Loads config from: tauri.conf.json and Cargo.toml
         .run(tauri::generate_context!())

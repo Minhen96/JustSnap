@@ -45,13 +45,38 @@ export function RegionSelector({ onDragStart }: RegionSelectorProps = {}) {
   const callIdRef = useRef<number>(0); // Track API call order to prevent race conditions
 
   // Handle mouse down - initiate tracking
-  const handleMouseDown = (e: React.MouseEvent) => {
-    e.preventDefault();
-    const { clientX, clientY } = e;
+  // We attach this to the global window as well to catch edge clicks
+  const handleMouseDown = (e: React.MouseEvent | MouseEvent) => {
+    // If it's a React event, prevent default
+    if ('preventDefault' in e) e.preventDefault();
+    
+    const clientX = e.clientX;
+    const clientY = e.clientY;
     
     setIsMouseDown(true);
     setStartPos({ x: clientX, y: clientY });
   };
+
+  // Enforce fullscreen and global listener on mount
+  useEffect(() => {
+    const enforceFullscreen = async () => {
+        try {
+            const { getCurrentWindow } = await import('@tauri-apps/api/window');
+            await getCurrentWindow().setFullscreen(true);
+        } catch (e) {
+            console.error('Failed to set fullscreen:', e);
+        }
+    };
+    enforceFullscreen();
+
+    // Attach global mousedown listener to catch edge clicks that React might miss
+    window.addEventListener('mousedown', handleMouseDown);
+    return () => {
+        window.removeEventListener('mousedown', handleMouseDown);
+    };
+  }, []);
+
+
 
   // Handle mouse move - update selection or check for smart windows
   const handleMouseMove = (e: React.MouseEvent) => {
@@ -59,6 +84,34 @@ export function RegionSelector({ onDragStart }: RegionSelectorProps = {}) {
 
     // Logic 1: Mouse is UP - Just hovering (Smart Select Mode)
     if (!isMouseDown && isSmartSelectActive) {
+      // Logic 1.1: Check for Edge Hover (Frontend Event - Fast Path)
+      const EDGE_THRESHOLD = 20;
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+
+      if (
+        clientX <= EDGE_THRESHOLD ||
+        clientX >= w - EDGE_THRESHOLD ||
+        clientY <= EDGE_THRESHOLD ||
+        clientY >= h - EDGE_THRESHOLD
+      ) {
+        // Invalidate previous async searches to prevent overwrite
+        callIdRef.current++;
+
+        // User is hovering the edge -> Select Full Screen
+        setHighlightedWindow({
+          id: -999, // Special ID for full screen
+          title: 'Full Screen',
+          app_name: 'System',
+          x: 0,
+          y: 0,
+          width: w,
+          height: h,
+          z_order: -100,
+        });
+        return;
+      }
+
       // Throttle API calls: only check every 30ms or if moved >5px
       // Reduced throttle for better responsiveness when crossing window boundaries
       const now = Date.now();
@@ -190,20 +243,98 @@ export function RegionSelector({ onDragStart }: RegionSelectorProps = {}) {
       }
     } else {
       // It was a Click (no drag)
-      if (highlightedWindow) {
-        // Capture the Smart Window
-        const region = {
-          x: highlightedWindow.x,
-          y: highlightedWindow.y,
-          width: highlightedWindow.width,
-          height: highlightedWindow.height,
-        };
+      
+      // Feature: Check if click was on edge (Full Screen Force)
+      const EDGE_THRESHOLD = 20; 
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      const isEdgeClick = startPos && (
+        startPos.x <= EDGE_THRESHOLD || 
+        startPos.x >= w - EDGE_THRESHOLD || 
+        startPos.y <= EDGE_THRESHOLD || 
+        startPos.y >= h - EDGE_THRESHOLD
+      );
+
+      if (highlightedWindow || isEdgeClick) {
+        // Capture the Smart Window OR Full Screen Force
+        
+        // Determine target region
+        let region: Region;
+        
+        const isFullScreen = (highlightedWindow?.id === -999) || isEdgeClick;
+
+        if (highlightedWindow && !isEdgeClick) {
+             region = {
+                x: highlightedWindow.x,
+                y: highlightedWindow.y,
+                width: highlightedWindow.width,
+                height: highlightedWindow.height,
+             };
+        } else {
+             // Fallback/Force to full screen
+             region = { x: 0, y: 0, width: w, height: h };
+        }
+
         // Update state immediately for responsiveness
         setCurrentRegion(region);
-        await captureRegion(region);
+        
+        // SPECIAL CASE: Full Screen
+        if (isFullScreen) {
+          console.log('[RegionSelector] Triggering Full Screen Capture (Edge/Smart)');
+          await captureFullScreen();
+        } else {
+          await captureRegion(region);
+        }
       } else {
         setCurrentRegion(null);
       }
+    }
+  };
+
+  const captureFullScreen = async () => {
+    try {
+       setProcessing(true);
+       
+       const { invoke } = await import('@tauri-apps/api/core');
+       
+       // Hide border before capturing: Wait for React render + Paint
+       await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 30)));
+
+       const base64Data = await invoke<string>('capture_full_screen');
+       
+       const res = await fetch(`data:image/bmp;base64,${base64Data}`);
+       const blob = await res.blob();
+       const imageUrl = URL.createObjectURL(blob);
+       
+       const screenshot = {
+        id: crypto.randomUUID(),
+        imageData: imageUrl,
+        region: { x:0, y:0, width: window.innerWidth, height: window.innerHeight },
+        timestamp: Date.now(),
+        mode: 'capture' as const,
+      };
+      setScreenshot(screenshot);
+
+      // OCR logic
+      console.log('[RegionSelector] Starting OCR...');
+      setOCRLoading(true);
+      setOCRProgress(0);
+
+      extractText(imageUrl, (progress) => {
+        setOCRProgress(progress);
+      })
+        .then((result) => {
+          setOCRResult(result);
+        })
+        .catch((error) => {
+          setOCRError(error instanceof Error ? error.message : 'OCR failed');
+        });
+
+    } catch (error) {
+      console.error('Failed to capture full screen:', error);
+      alert('Failed to capture screen.');
+    } finally {
+      setProcessing(false);
     }
   };
 
@@ -222,16 +353,17 @@ export function RegionSelector({ onDragStart }: RegionSelectorProps = {}) {
       
       const scale = window.devicePixelRatio || 1;
       
-      const imageData = await invoke<number[]>('capture_screen', {
+      const base64Data = await invoke<string>('capture_screen', {
         x: Math.round(region.x * scale),
         y: Math.round(region.y * scale),
         width: Math.round(region.width * scale),
         height: Math.round(region.height * scale),
       });
 
-      // Convert raw bytes to Blob/URL
-      const u8Array = new Uint8Array(imageData);
-      const blob = new Blob([u8Array], { type: 'image/png' });
+      // Convert Base64 string to Blob
+      // Note: Backend now returns BMP (uncompressed) for speed, but browsers handle BMP well as image source
+      const res = await fetch(`data:image/bmp;base64,${base64Data}`);
+      const blob = await res.blob();
       const imageUrl = URL.createObjectURL(blob);
 
       // Update store
@@ -289,10 +421,11 @@ export function RegionSelector({ onDragStart }: RegionSelectorProps = {}) {
   return (
     <div
       ref={containerRef}
-      className="absolute inset-0 w-full h-full cursor-crosshair"
+      className="fixed inset-0 w-full h-full cursor-crosshair z-50"
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
+
     >
       {/* Dimming Overlay with Hole - COMPLETELY HIDE WHEN PROCESSING */}
       {!isProcessing && (

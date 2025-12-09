@@ -8,8 +8,9 @@ use tauri::command;
 // ============================================
 
 #[command]
-pub async fn capture_screen(x: i32, y: i32, width: i32, height: i32) -> Result<Vec<u8>, String> {
+pub async fn capture_screen(x: i32, y: i32, width: i32, height: i32) -> Result<String, String> {
     use crate::screen_capture::{capture_region, CaptureRegion};
+    use base64::{engine::general_purpose, Engine as _};
 
     let region = CaptureRegion {
         x,
@@ -18,32 +19,40 @@ pub async fn capture_screen(x: i32, y: i32, width: i32, height: i32) -> Result<V
         height,
     };
 
-    capture_region(region).await
+    let bytes = capture_region(region).await?;
+
+    // Convert to Base64 to avoid JSON serialization overhead of byte arrays
+    Ok(general_purpose::STANDARD.encode(&bytes))
 }
 
 #[command]
-pub async fn capture_full_screen(app: tauri::AppHandle) -> Result<Vec<u8>, String> {
+pub async fn capture_full_screen(app: tauri::AppHandle) -> Result<String, String> {
     use crate::screen_capture::capture_full_screen;
+    use base64::{engine::general_purpose, Engine as _};
     use tauri::Manager;
 
-    // Get the main window
-    if let Some(window) = app.get_webview_window("main") {
-        // Hide the window completely
-        let _ = window.hide();
+    let window = app.get_webview_window("main");
 
-        // Re-enable cursor events just in case
-        let _ = window.set_ignore_cursor_events(false);
+    // Get the main window and hide it
+    if let Some(ref win) = window {
+        let _ = win.hide();
+        let _ = win.set_ignore_cursor_events(false);
     }
 
     // Slight delay to allow window to hide
     std::thread::sleep(std::time::Duration::from_millis(100));
 
-    capture_full_screen().await
-}
+    let capture_result = capture_full_screen().await;
 
-// ============================================
-// Hotkey Commands
-// ============================================
+    // Show the window again immediately
+    if let Some(ref win) = window {
+        let _ = win.show();
+        let _ = win.set_focus();
+    }
+
+    let bytes = capture_result?;
+    Ok(general_purpose::STANDARD.encode(&bytes))
+}
 
 #[derive(serde::Deserialize)]
 pub struct HotkeyConfig {
@@ -406,6 +415,28 @@ fn rectangles_intersect(
     !(right1 <= left2 || right2 <= left1 || bottom1 <= top2 || bottom2 <= top1)
 }
 
+#[command]
+pub async fn get_cursor_position() -> Result<(i32, i32), String> {
+    #[cfg(windows)]
+    {
+        use windows::Win32::Foundation::POINT;
+        use windows::Win32::UI::WindowsAndMessaging::GetCursorPos;
+
+        let mut point = POINT { x: 0, y: 0 };
+        unsafe {
+            if GetCursorPos(&mut point).is_ok() {
+                Ok((point.x, point.y))
+            } else {
+                Err("Failed to get cursor position".to_string())
+            }
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        Ok((0, 0)) // Placeholder for other OS
+    }
+}
+
 // Get window at specific screen coordinates (WYSIWYG - what you see is what you get)
 #[command]
 pub async fn get_window_at_point(x: i32, y: i32) -> Result<Option<WindowInfo>, String> {
@@ -413,7 +444,7 @@ pub async fn get_window_at_point(x: i32, y: i32) -> Result<Option<WindowInfo>, S
     {
         use windows::Win32::Foundation::POINT;
         use windows::Win32::UI::WindowsAndMessaging::{
-            IsWindowVisible, WindowFromPoint, IsIconic, GetAncestor, GA_ROOT
+            GetAncestor, IsIconic, IsWindowVisible, WindowFromPoint, GA_ROOT,
         };
         use xcap::Window;
 
@@ -470,14 +501,20 @@ pub async fn get_window_at_point(x: i32, y: i32) -> Result<Option<WindowInfo>, S
                         || title_lower == "default ime"
                         || title_lower.contains("overlay")
                         || app_lower.contains("justsnap")
-                        || title_lower.contains("justsnap") {
+                        || title_lower.contains("justsnap")
+                    {
                         return Ok(None);
                     }
 
                     // STRICT RULE: Check if this window is covered by any other window
                     // If any part is covered, reject it entirely
                     let current_z = z_order_map.get(&window_id).copied().unwrap_or(i32::MAX);
-                    let current_rect = (window.x(), window.y(), window.width() as i32, window.height() as i32);
+                    let current_rect = (
+                        window.x(),
+                        window.y(),
+                        window.width() as i32,
+                        window.height() as i32,
+                    );
 
                     // Check all other windows
                     for other_window in &all_windows {
@@ -486,12 +523,18 @@ pub async fn get_window_at_point(x: i32, y: i32) -> Result<Option<WindowInfo>, S
                         }
 
                         // Skip minimized/invalid windows
-                        if other_window.is_minimized() || other_window.width() == 0 || other_window.height() == 0 {
+                        if other_window.is_minimized()
+                            || other_window.width() == 0
+                            || other_window.height() == 0
+                        {
                             continue;
                         }
 
                         // Get other window's Z-order
-                        let other_z = z_order_map.get(&other_window.id()).copied().unwrap_or(i32::MAX);
+                        let other_z = z_order_map
+                            .get(&other_window.id())
+                            .copied()
+                            .unwrap_or(i32::MAX);
 
                         // If other window is above us (lower z-order = higher in stack)
                         if other_z < current_z {

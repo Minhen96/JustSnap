@@ -37,14 +37,14 @@ pub async fn capture_region(region: CaptureRegion) -> Result<Vec<u8>, String> {
     // Crop to the specified region
     let cropped = crop_image(&full_image, region)?;
 
-    // Encode as PNG
-    encode_as_png(&cropped)
+    // Encode as BMP
+    encode_as_bmp(&cropped)
 }
 
 /// Capture the full screen (primary monitor)
 pub async fn capture_full_screen() -> Result<Vec<u8>, String> {
     let rgba_image = capture_full_screen_raw().await?;
-    encode_as_png(&rgba_image)
+    encode_as_bmp(&rgba_image)
 }
 
 /// Capture the full screen raw image (primary monitor)
@@ -83,11 +83,35 @@ pub async fn capture_monitor(monitor_id: i32) -> Result<Vec<u8>, String> {
         ImageBuffer::<Rgba<u8>, Vec<u8>>::from_raw(image.width(), image.height(), image.into_raw())
             .ok_or_else(|| "Failed to create image buffer".to_string())?;
 
-    encode_as_png(&rgba_image)
+    encode_as_bmp(&rgba_image)
+}
+
+/// Encode an image as BMP bytes (uncompressed, faster than PNG)
+fn encode_as_bmp(image: &RgbaImage) -> Result<Vec<u8>, String> {
+    use image::codecs::bmp::BmpEncoder;
+    use image::ImageEncoder;
+
+    let mut buffer = Cursor::new(Vec::new());
+
+    // Use BMP encoder for zero compression overhead
+    let encoder = BmpEncoder::new(&mut buffer);
+
+    encoder
+        .write_image(
+            image.as_raw(),
+            image.width(),
+            image.height(),
+            image::ExtendedColorType::Rgba8,
+        )
+        .map_err(|e| format!("Failed to encode image as BMP: {}", e))?;
+
+    Ok(buffer.into_inner())
 }
 
 /// Crop an image to a specific region
 fn crop_image(image: &RgbaImage, region: CaptureRegion) -> Result<RgbaImage, String> {
+    use image::imageops;
+
     let x = region.x.max(0) as u32;
     let y = region.y.max(0) as u32;
     let width = region.width.max(1) as u32;
@@ -101,43 +125,7 @@ fn crop_image(image: &RgbaImage, region: CaptureRegion) -> Result<RgbaImage, Str
         return Err("Invalid crop region: outside image bounds".to_string());
     }
 
-    // Create a new image with the cropped region
-    let mut cropped = RgbaImage::new(max_width, max_height);
-
-    for cy in 0..max_height {
-        for cx in 0..max_width {
-            let pixel = image.get_pixel(x + cx, y + cy);
-            cropped.put_pixel(cx, cy, *pixel);
-        }
-    }
-
-    Ok(cropped)
-}
-
-/// Encode an image as PNG bytes with optimal compression
-fn encode_as_png(image: &RgbaImage) -> Result<Vec<u8>, String> {
-    use image::codecs::png::{PngEncoder, CompressionType, FilterType};
-    use image::ImageEncoder;
-
-    let mut buffer = Cursor::new(Vec::new());
-
-    // Use PNG encoder with best quality settings:
-    // - CompressionType::Best: Highest compression quality (slower but better quality)
-    // - FilterType::Sub: Good filter for photographic images
-    let encoder = PngEncoder::new_with_quality(
-        &mut buffer,
-        CompressionType::Best,
-        FilterType::Sub,
-    );
-
-    encoder
-        .write_image(
-            image.as_raw(),
-            image.width(),
-            image.height(),
-            image::ExtendedColorType::Rgba8,
-        )
-        .map_err(|e| format!("Failed to encode image as PNG: {}", e))?;
-
-    Ok(buffer.into_inner())
+    // Use imageops for optimized cropping
+    let sub_image = imageops::crop_imm(image, x, y, max_width, max_height);
+    Ok(sub_image.to_image())
 }

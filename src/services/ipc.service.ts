@@ -4,7 +4,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import type {
   TauriCaptureRequest,
-  TauriCaptureResponse,
   Region,
   HotkeyConfig,
 } from '../types';
@@ -21,13 +20,29 @@ export async function captureScreen(region: Region): Promise<Uint8Array> {
     height: region.height,
   };
 
-  const response = await invoke<TauriCaptureResponse>('capture_screen', request);
-  return new Uint8Array(response.imageData);
+  const base64 = await invoke<string>('capture_screen', request as any);
+
+  // Convert Base64 string to Uint8Array
+  const binaryString = atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
 }
 
 export async function captureFullScreen(): Promise<Uint8Array> {
-  const response = await invoke<TauriCaptureResponse>('capture_full_screen');
-  return new Uint8Array(response.imageData);
+  const base64 = await invoke<string>('capture_full_screen');
+
+  // Convert Base64 string to Uint8Array
+  const binaryString = atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
 }
 
 /**

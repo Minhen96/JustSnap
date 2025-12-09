@@ -15,11 +15,11 @@
         "title": "JustSnap",
         "width": 1200,
         "height": 800,
-        "resizable": true,
-        "fullscreen": false,
+        "resizable": false,
+        "fullscreen": true,
         "transparent": true,
         "decorations": false,
-        "alwaysOnTop": false,
+        "alwaysOnTop": true,
         "visible": false
       }
     ],
