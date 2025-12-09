@@ -306,10 +306,19 @@ export function RegionSelector({ onDragStart }: RegionSelectorProps = {}) {
        const blob = await res.blob();
        const imageUrl = URL.createObjectURL(blob);
        
+       // Align full screen region to pixels as well
+       const pixelRatio = window.devicePixelRatio || 1;
+       const region = { 
+          x: 0, 
+          y: 0, 
+          width: Math.round(window.innerWidth * pixelRatio) / pixelRatio, 
+          height: Math.round(window.innerHeight * pixelRatio) / pixelRatio 
+       };
+
        const screenshot = {
         id: crypto.randomUUID(),
         imageData: imageUrl,
-        region: { x:0, y:0, width: window.innerWidth, height: window.innerHeight },
+        region,
         timestamp: Date.now(),
         mode: 'capture' as const,
       };
@@ -339,9 +348,18 @@ export function RegionSelector({ onDragStart }: RegionSelectorProps = {}) {
   };
 
   // Capture function
-  const captureRegion = async (region: Region) => {
+  const captureRegion = async (inputRegion: Region) => {
     try {
       setProcessing(true);
+
+      // ALIGNMENT FIX: Snap to physical pixels to prevent sub-pixel blurring (1:1 mapping)
+      const pixelRatio = window.devicePixelRatio || 1;
+      const region = {
+        x: Math.round(inputRegion.x * pixelRatio) / pixelRatio,
+        y: Math.round(inputRegion.y * pixelRatio) / pixelRatio,
+        width: Math.round(inputRegion.width * pixelRatio) / pixelRatio,
+        height: Math.round(inputRegion.height * pixelRatio) / pixelRatio,
+      };
 
       // Hide border before capturing: Wait for React render + Paint
       // Small delay (30ms) is REQUIRED to ensure the overlay is fully removed from the GPU buffer

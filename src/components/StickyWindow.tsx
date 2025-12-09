@@ -98,6 +98,26 @@ export function StickyWindow() {
   const [isHovered, setIsHovered] = useState(false);
   const [isPinned, setIsPinned] = useState(true);
 
+  // Keyboard Shortcuts Listener
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+C (Copy)
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
+        e.preventDefault();
+        handleCopy();
+      }
+
+      // Ctrl+S (Save)
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        handleSave();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [imagePath]); // Add imagePath dependency since actions depend on it
+
   const handleDrag = () => {
      getCurrentWindow().startDragging();
   };
@@ -126,22 +146,30 @@ export function StickyWindow() {
          const response = await fetch(imagePath);
          const blob = await response.blob();
          
-         // Try frontend clipboard first
+         // Prioritize Backend COPY
+         // Frontend clipboard API (navigator.clipboard) is flaky in some Tauri window contexts (especially sticky/alwaysOnTop)
+         // The backend command is reliable.
          try {
-             await navigator.clipboard.write([
-                 new ClipboardItem({ 'image/png': blob })
-             ]);
-             setFeedback("Copied!");
-         } catch (e) {
-             console.warn("Frontend copy failed, trying backend", e);
-             // Backend fallback
              const buffer = await blob.arrayBuffer();
              const bytes = new Uint8Array(buffer);
              await invoke('copy_image_to_clipboard', { imageData: Array.from(bytes) });
              setFeedback("Copied!");
+         } catch (backendErr) {
+             console.warn("Backend copy failed, trying frontend fallback", backendErr);
+             
+             // Fallback to Frontend
+             try {
+                await navigator.clipboard.write([
+                    new ClipboardItem({ 'image/png': blob })
+                ]);
+                setFeedback("Copied!");
+             } catch (frontendErr) {
+                 console.error("Frontend copy also failed", frontendErr);
+                 setFeedback("Copy Failed");
+             }
          }
       } catch (e) {
-          console.error("Copy failed", e);
+          console.error("Copy failed (fetch)", e);
           setFeedback("Copy Failed");
       }
       setTimeout(() => setFeedback(null), 2000);
