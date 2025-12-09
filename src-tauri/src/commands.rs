@@ -306,3 +306,47 @@ pub async fn create_translation_window(
 pub async fn close_window(window: tauri::Window) -> Result<(), String> {
     window.close().map_err(|e| e.to_string())
 }
+
+// ============================================
+// Window Enumeration for Smart Select
+// ============================================
+
+#[derive(serde::Serialize)]
+pub struct WindowInfo {
+    pub id: u32,
+    pub title: String,
+    pub x: i32,
+    pub y: i32,
+    pub width: u32,
+    pub height: u32,
+}
+
+#[command]
+pub async fn get_windows() -> Result<Vec<WindowInfo>, String> {
+    use xcap::Window;
+
+    let windows = Window::all().map_err(|e| e.to_string())?;
+
+    let mut window_infos = Vec::new();
+    for window in windows {
+        // Filter out minimized or invalid windows if possible
+        // Removed !is_minimized() as it might be flaky for some apps or during focus changes
+        if window.width() > 0 && window.height() > 0 {
+            let title = window.title();
+            // Filter out our own windows to prevent self-selection/overlay issues
+            // We allow empty titles because many modern apps/dialogs have no title but are valid top-layer windows
+            if !title.contains("JustSnap") && !title.contains("justsnap") {
+                window_infos.push(WindowInfo {
+                    id: window.id(),
+                    title: title.to_string(),
+                    x: window.x(),
+                    y: window.y(),
+                    width: window.width(),
+                    height: window.height(),
+                });
+            }
+        }
+    }
+
+    Ok(window_infos)
+}

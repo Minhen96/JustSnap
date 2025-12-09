@@ -9,6 +9,7 @@ import type { CaptureMode } from '../../types';
 export function SnipOverlay() {
   const mode = useAppStore((state) => state.currentMode);
   const setMode = useAppStore((state) => state.setMode);
+  const isProcessing = useAppStore((state) => state.isProcessing);
   const [isSelecting, setIsSelecting] = useState(false);
 
   // Handle ESC key to cancel
@@ -28,8 +29,8 @@ export function SnipOverlay() {
       {/* Darkened overlay background is now handled by RegionSelector for better control */}
       {mode !== 'capture' && <div className="absolute inset-0 bg-black/40" />}
 
-      {/* Mode Selector Bar - Top - Hide when selecting */}
-      {!isSelecting && (
+      {/* Mode Selector Bar - Top - Hide when selecting or processing */}
+      {!isSelecting && !isProcessing && (
         <div className="absolute top-6 left-1/2 -translate-x-1/2 flex gap-2 bg-white rounded-lg shadow-2xl p-2 z-10 animate-slideDown">
         <ModeButton
           mode="capture"
@@ -44,7 +45,6 @@ export function SnipOverlay() {
           currentMode={mode}
           onClick={() => setMode('scrolling')}
           icon="📜"
-          disabled
         >
           Scrolling
         </ModeButton>
@@ -53,7 +53,6 @@ export function SnipOverlay() {
           currentMode={mode}
           onClick={() => setMode('record')}
           icon="🎥"
-          disabled
         >
           Record
         </ModeButton>
@@ -63,10 +62,12 @@ export function SnipOverlay() {
       </div>
       )}
 
-      {/* Hint text */}
+      {/* Hint text - Hide when processing */}
+      {!isProcessing && (
       <div className="absolute top-24 left-1/2 -translate-x-1/2 text-white text-sm bg-black/60 px-4 py-2 rounded-lg animate-fadeIn">
         Click and drag to select area • Press ESC to cancel
       </div>
+      )}
 
       {/* Region selector */}
       <div className="absolute inset-0 cursor-crosshair">
