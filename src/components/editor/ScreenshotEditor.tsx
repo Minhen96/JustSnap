@@ -54,14 +54,6 @@ export function ScreenshotEditor() {
     }, 100);
   };
 
-  // Keyboard shortcuts hook
-  useScreenshotKeyboard({
-    onUndo: undo,
-    onRedo: redo,
-    onSetTool: setCurrentTool,
-    onClose: handleClose,
-  });
-
   // Screenshot actions hook
   const { handleCopy, handleSave, handleStick, handleGenerateAiCode } = useScreenshotActions({
     screenshot: currentScreenshot!,
@@ -69,6 +61,16 @@ export function ScreenshotEditor() {
     height: dimensions.height,
     onFeedback: setFeedback,
     onClose: handleClose,
+  });
+
+  // Keyboard shortcuts hook
+  useScreenshotKeyboard({
+    onUndo: undo,
+    onRedo: redo,
+    onSetTool: setCurrentTool,
+    onClose: handleClose,
+    onCopy: handleCopy,
+    onSave: handleSave,
   });
 
 

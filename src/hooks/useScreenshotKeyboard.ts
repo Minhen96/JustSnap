@@ -9,6 +9,8 @@ interface UseScreenshotKeyboardProps {
   onRedo: () => void;
   onSetTool: (tool: AnnotationTool) => void;
   onClose: () => void;
+  onCopy?: () => void;
+  onSave?: () => void;
   enabled?: boolean;
 }
 
@@ -18,6 +20,8 @@ interface UseScreenshotKeyboardProps {
  * Shortcuts:
  * - Ctrl+Z: Undo
  * - Ctrl+Y: Redo
+ * - Ctrl+C: Copy
+ * - Ctrl+S: Save
  * - P: Pen tool
  * - H: Highlighter tool
  * - R: Rectangle tool
@@ -32,12 +36,28 @@ export function useScreenshotKeyboard({
   onRedo,
   onSetTool,
   onClose,
+  onCopy,
+  onSave,
   enabled = true,
 }: UseScreenshotKeyboardProps) {
   useEffect(() => {
     if (!enabled) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Copy shortcut
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
+        e.preventDefault();
+        onCopy?.();
+        return;
+      }
+
+      // Save shortcut
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        onSave?.();
+        return;
+      }
+
       // Undo/Redo shortcuts
       if (e.ctrlKey && e.key === 'z') {
         e.preventDefault();
@@ -64,6 +84,10 @@ export function useScreenshotKeyboard({
             onSetTool('rectangle');
             break;
           case 'c':
+            // If just 'c' is pressed (no ctrl), it selects circle tool
+            // But usually circle tool is handled below.
+            // If the user wants specific key for copy without ctrl, that's different.
+            // But they asked for Ctrl+C.
             onSetTool('circle');
             break;
           case 'a':
@@ -84,5 +108,5 @@ export function useScreenshotKeyboard({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [enabled, onUndo, onRedo, onSetTool, onClose]);
+  }, [enabled, onUndo, onRedo, onSetTool, onClose, onCopy, onSave]);
 }
