@@ -153,11 +153,9 @@ pub async fn open_save_dialog(app: tauri::AppHandle) -> Result<Option<String>, S
 #[command]
 pub async fn copy_image_to_clipboard(image_data: Vec<u8>) -> Result<(), String> {
     use arboard::{Clipboard, ImageData};
-    use image::ImageFormat;
-    use std::io::Cursor;
 
-    // Decode PNG bytes to raw RGBA
-    let img = image::load(Cursor::new(&image_data), ImageFormat::Png)
+    // Decode bytes to raw RGBA (auto-detect format, handles BMP/PNG)
+    let img = image::load_from_memory(&image_data)
         .map_err(|e| format!("Failed to decode image: {}", e))?
         .to_rgba8();
 

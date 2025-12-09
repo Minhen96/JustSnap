@@ -31,23 +31,19 @@ export function StickyWindow() {
        img.onload = () => {
            const w = window.innerWidth;
            const h = window.innerHeight;
-           const scaleX = w / img.width;
-           const scaleY = h / img.height;
-           const scale = Math.min(scaleX, scaleY);
+           
+           const dpr = window.devicePixelRatio || 1;
+           const physicalWindowWidth = w * dpr;
+           const physicalScale = physicalWindowWidth / img.width;
 
            if (import.meta.env.DEV) {
-               console.log("━━━ Sticky Image Quality Debug ━━━");
-               console.log("Image natural size:", img.width, "x", img.height);
-               console.log("Window size:", w, "x", h);
-               console.log("Scale factor:", scale.toFixed(2) + "x");
-               console.log("Rendering mode:", scale <= 1.0 ? "crisp-edges" : "high-quality");
-               console.log("Quality:", scale === 1.0 ? "PERFECT 1:1" : scale < 1.0 ? "Downscaled" : "Upscaled (blur possible)");
+             console.log("Phys-to-Phys Scale:", physicalScale);
            }
 
            setImageNaturalSize({ width: img.width, height: img.height });
            setAspectRatio(img.width / img.height);
            setDimensions({ width: w, height: h });
-           setScaleFactor(scale);
+           setScaleFactor(physicalScale);
        };
        img.onerror = (e) => {
            console.error("Sticky Image Failed:", e);
@@ -68,8 +64,9 @@ export function StickyWindow() {
 
         // Recalculate scale factor for rendering quality adjustment
         if (imageNaturalSize.width > 0) {
-            const scaleX = width / imageNaturalSize.width;
-            const scaleY = height / imageNaturalSize.height;
+            const dpr = window.devicePixelRatio || 1;
+            const scaleX = (width * dpr) / imageNaturalSize.width;
+            const scaleY = (height * dpr) / imageNaturalSize.height;
             setScaleFactor(Math.min(scaleX, scaleY));
         }
 
@@ -111,6 +108,12 @@ export function StickyWindow() {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
         e.preventDefault();
         handleSave();
+      }
+
+      // Escape (Close)
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        handleClose();
       }
     };
 
@@ -233,9 +236,9 @@ export function StickyWindow() {
             className="absolute top-0 left-0 w-full h-full object-contain select-none pointer-events-none"
             style={{
               // Adaptive rendering based on scale:
-              // - At 1:1 or smaller: Use crisp-edges (pixel-perfect)
-              // - When scaled up: Use high-quality smoothing
-              imageRendering: scaleFactor <= 1.0 ? 'crisp-edges' : 'high-quality',
+              // - At 1:1 or smaller (or slight upscale): Use pixelated/crisp-edges (sharp)
+              // - When scaled up significantly (> 10%): Use high-quality smoothing
+              imageRendering: scaleFactor < 1.1 ? 'pixelated' : 'high-quality',
               WebkitFontSmoothing: 'antialiased',
               // Dynamic sharpening - more at larger scales
               filter: scaleFactor > 1.2
