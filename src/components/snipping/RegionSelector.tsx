@@ -1,6 +1,4 @@
 // JustSnap - Region Selection Component
-// Reference: use_case.md lines 42-52, SC-01
-
 import { useState, useRef, useEffect } from 'react';
 import { useAppStore } from '../../store/appStore';
 import type { Region } from '../../types';
@@ -13,10 +11,12 @@ interface RegionSelectorProps {
 interface WindowInfo {
   id: number;
   title: string;
+  app_name: string;
   x: number;
   y: number;
   width: number;
   height: number;
+  z_order: number; // Lower = closer to user (top-most)
 }
 
 export function RegionSelector({ onDragStart }: RegionSelectorProps = {}) {
@@ -30,6 +30,7 @@ export function RegionSelector({ onDragStart }: RegionSelectorProps = {}) {
   const setOCRProgress = useAppStore((state) => state.setOCRProgress);
   const setOCRResult = useAppStore((state) => state.setOCRResult);
   const setOCRError = useAppStore((state) => state.setOCRError);
+  const isSmartSelectActive = useAppStore((state) => state.isSmartSelectActive);
 
   const [isMouseDown, setIsMouseDown] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -38,30 +39,10 @@ export function RegionSelector({ onDragStart }: RegionSelectorProps = {}) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Smart Selection State
-  const [windows, setWindows] = useState<WindowInfo[]>([]);
   const [highlightedWindow, setHighlightedWindow] = useState<WindowInfo | null>(null);
-
-  // Load windows on mount
-  useEffect(() => {
-    const loadWindows = async () => {
-      try {
-        const { invoke } = await import('@tauri-apps/api/core');
-        const wins = await invoke<WindowInfo[]>('get_windows');
-        const scale = window.devicePixelRatio || 1;
-        const scaledWins = wins.map((w) => ({
-          ...w,
-          x: w.x / scale,
-          y: w.y / scale,
-          width: w.width / scale,
-          height: w.height / scale,
-        }));
-        setWindows(scaledWins);
-      } catch (e) {
-        console.error('Failed to get windows', e);
-      }
-    };
-    loadWindows();
-  }, []);
+  const lastCheckRef = useRef<{ x: number; y: number; time: number } | null>(null);
+  const lastWindowIdRef = useRef<number | null>(null);
+  const callIdRef = useRef<number>(0); // Track API call order to prevent race conditions
 
   // Handle mouse down - initiate tracking
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -70,44 +51,92 @@ export function RegionSelector({ onDragStart }: RegionSelectorProps = {}) {
     
     setIsMouseDown(true);
     setStartPos({ x: clientX, y: clientY });
-    
-    // Don't start selection immediately. content with just setting start pos.
-    // If we have a highlighted window, we might capture it on MouseUp if no drag occurs.
   };
 
   // Handle mouse move - update selection or check for smart windows
   const handleMouseMove = (e: React.MouseEvent) => {
     const { clientX, clientY } = e;
 
-    // Logic 1: Mouse is UP - Just hovering
-    if (!isMouseDown) {
-      const screenW = window.innerWidth;
-      const screenH = window.innerHeight;
+    // Logic 1: Mouse is UP - Just hovering (Smart Select Mode)
+    if (!isMouseDown && isSmartSelectActive) {
+      // Throttle API calls: only check every 30ms or if moved >5px
+      // Reduced throttle for better responsiveness when crossing window boundaries
+      const now = Date.now();
+      const last = lastCheckRef.current;
 
-      // Smart Window Detection
-      // Logic: Iterate through windows.
-      // Fix for "Selecting Behind":
-      // The previous "isFullyOnScreen" check was too strict. If a top window was slightly 
-      // off-screen (shadows, maximized), it was ignored, causing fall-through to the background.
-      // New Logic: 
-      // 1. Find ALL windows containing the mouse.
-      // 2. Sort by Area (Smallest First). 
-      //    (Assumption: Foreground windows are usually smaller than the background/desktop).
-      
-      const candidates = windows.filter(w => 
-        clientX >= w.x && clientX <= w.x + w.width &&
-        clientY >= w.y && clientY <= w.y + w.height
-      );
+      if (last) {
+        const timeDiff = now - last.time;
+        const distDiff = Math.sqrt(Math.pow(clientX - last.x, 2) + Math.pow(clientY - last.y, 2));
 
-      if (candidates.length > 0) {
-        // SORT: Smallest Area First
-        candidates.sort((a, b) => (a.width * a.height) - (b.width * b.height));
-        
-        // Pick the Smallest valid candidate immediately
-        setHighlightedWindow(candidates[0]);
-      } else {
-        setHighlightedWindow(null);
+        if (timeDiff < 30 && distDiff < 5) {
+          return; // Skip this check
+        }
       }
+
+      lastCheckRef.current = { x: clientX, y: clientY, time: now };
+
+      // Increment call ID to track this specific request
+      const currentCallId = ++callIdRef.current;
+
+      // Use async IIFE to avoid blocking
+      (async () => {
+        try {
+          const { invoke } = await import('@tauri-apps/api/core');
+          const { getCurrentWindow } = await import('@tauri-apps/api/window');
+          const scale = window.devicePixelRatio || 1;
+
+          // Convert screen coordinates to physical pixels
+          const physicalX = Math.round(clientX * scale);
+          const physicalY = Math.round(clientY * scale);
+
+          // CRITICAL: Temporarily make overlay click-through so WindowFromPoint sees beneath us
+          const tauriWindow = getCurrentWindow();
+          await tauriWindow.setIgnoreCursorEvents(true);
+
+          // Small delay to ensure window change is applied
+          await new Promise(resolve => setTimeout(resolve, 1));
+
+          // Ask backend: "What window is visible at this exact point?"
+          const windowAtPoint = await invoke<WindowInfo | null>('get_window_at_point', {
+            x: physicalX,
+            y: physicalY,
+          });
+
+          // Restore cursor events so we can capture clicks
+          await tauriWindow.setIgnoreCursorEvents(false);
+
+          // CRITICAL: Ignore stale responses (race condition prevention)
+          if (currentCallId !== callIdRef.current) {
+            return;
+          }
+
+          if (windowAtPoint) {
+            // Scale coordinates back to CSS pixels for display
+            const scaledWindow = {
+              ...windowAtPoint,
+              x: windowAtPoint.x / scale,
+              y: windowAtPoint.y / scale,
+              width: windowAtPoint.width / scale,
+              height: windowAtPoint.height / scale,
+            };
+
+            // Always update the highlighted window to match what's under the cursor
+            // This ensures we never show a window that's been covered
+            lastWindowIdRef.current = windowAtPoint.id;
+            setHighlightedWindow(scaledWindow);
+          } else {
+            lastWindowIdRef.current = null;
+            setHighlightedWindow(null);
+          }
+        } catch (e) {
+          console.error('[Smart Select] Error:', e);
+          // Only clear if this is the latest call
+          if (currentCallId === callIdRef.current) {
+            setHighlightedWindow(null);
+          }
+        }
+      })();
+
       return;
     }
 
@@ -188,14 +217,9 @@ export function RegionSelector({ onDragStart }: RegionSelectorProps = {}) {
       // before the native screenshot is taken. 0ms causes intermittent dark captures.
       await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 30)));
 
-
-
       // Import Tauri API dynamically
       const { invoke } = await import('@tauri-apps/api/core');
       
-      // Call Rust command
-      // Note: Rust expects integers and physical pixels, scaling handled if needed
-      // (Usually xcap handles logical/physical, but let's stick to simple first)
       const scale = window.devicePixelRatio || 1;
       
       const imageData = await invoke<number[]>('capture_screen', {
@@ -246,7 +270,6 @@ export function RegionSelector({ onDragStart }: RegionSelectorProps = {}) {
   };
 
   // SVG Path for the "hole" effect
-  // Outer rectangle (clockwise) + Inner rectangle (counter-clockwise)
   const getOverlayPath = () => {
     const w = window.innerWidth;
     const h = window.innerHeight;
@@ -256,7 +279,7 @@ export function RegionSelector({ onDragStart }: RegionSelectorProps = {}) {
 
     if (currentRegion) {
       const { x, y, width, height } = currentRegion;
-      // Inner hole (counter-clockwise to create hole with fill-rule="evenodd")
+      // Inner hole (counter-clockwise)
       path += ` M ${x} ${y} V ${y + height} H ${x + width} V ${y} Z`;
     }
 
@@ -264,7 +287,7 @@ export function RegionSelector({ onDragStart }: RegionSelectorProps = {}) {
   };
 
   return (
-    <div 
+    <div
       ref={containerRef}
       className="absolute inset-0 w-full h-full cursor-crosshair"
       onMouseDown={handleMouseDown}

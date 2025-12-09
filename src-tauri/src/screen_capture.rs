@@ -1,7 +1,7 @@
 // JustSnap - Screen Capture Module
 // Handles screen capture functionality using xcap
 
-use image::{ImageBuffer, ImageFormat, Rgba, RgbaImage};
+use image::{ImageBuffer, Rgba, RgbaImage};
 use std::io::Cursor;
 use xcap::Monitor;
 

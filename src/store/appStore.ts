@@ -13,6 +13,7 @@ interface AppState {
   // Selection state
   selectedRegion: Region | null;
   isSelecting: boolean;
+  isSmartSelectActive: boolean; // Toggle for window detection feature
 
   // Screenshot state
   currentScreenshot: Screenshot | null;
@@ -50,6 +51,7 @@ interface AppState {
   updateSelection: (region: Region) => void;
   finishSelection: () => void;
   cancelSelection: () => void;
+  toggleSmartSelect: () => void;
 
   // Actions - Screenshot
   setScreenshot: (screenshot: Screenshot) => void;
@@ -93,6 +95,7 @@ export const useAppStore = create<AppState>((set) => ({
   currentMode: 'capture',
   selectedRegion: null,
   isSelecting: false,
+  isSmartSelectActive: true, // Default ON
   currentScreenshot: null,
   screenshots: [],
   currentTool: 'rectangle', // Default to rectangle
@@ -181,6 +184,8 @@ export const useAppStore = create<AppState>((set) => ({
       isSelecting: false,
       showToolbar: false,
     }),
+
+  toggleSmartSelect: () => set((state) => ({ isSmartSelectActive: !state.isSmartSelectActive })),
 
   // Screenshot actions
   setScreenshot: (screenshot) =>

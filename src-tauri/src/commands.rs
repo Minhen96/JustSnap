@@ -22,8 +22,21 @@ pub async fn capture_screen(x: i32, y: i32, width: i32, height: i32) -> Result<V
 }
 
 #[command]
-pub async fn capture_full_screen() -> Result<Vec<u8>, String> {
+pub async fn capture_full_screen(app: tauri::AppHandle) -> Result<Vec<u8>, String> {
     use crate::screen_capture::capture_full_screen;
+    use tauri::Manager;
+
+    // Get the main window
+    if let Some(window) = app.get_webview_window("main") {
+        // Hide the window completely
+        let _ = window.hide();
+
+        // Re-enable cursor events just in case
+        let _ = window.set_ignore_cursor_events(false);
+    }
+
+    // Slight delay to allow window to hide
+    std::thread::sleep(std::time::Duration::from_millis(100));
 
     capture_full_screen().await
 }
@@ -95,7 +108,6 @@ pub async fn hide_overlay(app: tauri::AppHandle) -> Result<(), String> {
 // ============================================
 
 #[command]
-
 pub async fn save_image(path: String, image_data: Vec<u8>) -> Result<(), String> {
     use std::fs::File;
     use std::io::Write;
@@ -113,7 +125,6 @@ pub async fn save_text(_content: String, file_name: String) -> Result<String, St
 }
 
 #[command]
-
 pub async fn open_save_dialog(app: tauri::AppHandle) -> Result<Option<String>, String> {
     use tauri_plugin_dialog::DialogExt;
 
@@ -315,10 +326,213 @@ pub async fn close_window(window: tauri::Window) -> Result<(), String> {
 pub struct WindowInfo {
     pub id: u32,
     pub title: String,
+    pub app_name: String,
     pub x: i32,
     pub y: i32,
     pub width: u32,
     pub height: u32,
+    pub z_order: i32, // Lower number = closer to user (top-most)
+}
+
+#[cfg(windows)]
+fn get_window_z_order_map() -> std::collections::HashMap<u32, i32> {
+    use std::collections::HashMap;
+    use windows::Win32::Foundation::LPARAM;
+    use windows::Win32::UI::WindowsAndMessaging::EnumWindows;
+
+    let mut z_order_map: HashMap<u32, i32> = HashMap::new();
+
+    // Create a tuple on the stack that will be passed to the callback
+    // The callback will increment z_index as it enumerates windows
+    let mut data = (0i32, &mut z_order_map);
+
+    unsafe {
+        // Enumerate all top-level windows in Z-order (top to bottom)
+        let _ = EnumWindows(
+            Some(enum_windows_proc),
+            LPARAM(&mut data as *mut _ as isize),
+        );
+    }
+
+    z_order_map
+}
+
+#[cfg(windows)]
+unsafe extern "system" fn enum_windows_proc(
+    hwnd: windows::Win32::Foundation::HWND,
+    lparam: windows::Win32::Foundation::LPARAM,
+) -> windows::Win32::Foundation::BOOL {
+    use std::collections::HashMap;
+
+    let data = lparam.0 as *mut (i32, *mut HashMap<u32, i32>);
+    let (z_index, map_ptr) = &mut *data;
+    let map = &mut **map_ptr;
+
+    // Store the Z-order for this window handle
+    let window_id = hwnd.0 as u32;
+    map.insert(window_id, *z_index);
+    *z_index += 1;
+
+    windows::Win32::Foundation::BOOL::from(true) // Continue enumeration
+}
+
+#[cfg(not(windows))]
+fn get_window_z_order_map() -> std::collections::HashMap<u32, i32> {
+    // On non-Windows platforms, return empty map
+    // The z_order will default to the xcap enumeration order
+    std::collections::HashMap::new()
+}
+
+// Helper function to check if two rectangles intersect
+fn rectangles_intersect(
+    rect1: (i32, i32, i32, i32), // (x, y, width, height)
+    rect2: (i32, i32, i32, i32),
+) -> bool {
+    let (x1, y1, w1, h1) = rect1;
+    let (x2, y2, w2, h2) = rect2;
+
+    // Calculate boundaries
+    let left1 = x1;
+    let right1 = x1 + w1;
+    let top1 = y1;
+    let bottom1 = y1 + h1;
+
+    let left2 = x2;
+    let right2 = x2 + w2;
+    let top2 = y2;
+    let bottom2 = y2 + h2;
+
+    // Check if rectangles do NOT intersect, then negate
+    !(right1 <= left2 || right2 <= left1 || bottom1 <= top2 || bottom2 <= top1)
+}
+
+// Get window at specific screen coordinates (WYSIWYG - what you see is what you get)
+#[command]
+pub async fn get_window_at_point(x: i32, y: i32) -> Result<Option<WindowInfo>, String> {
+    #[cfg(windows)]
+    {
+        use windows::Win32::Foundation::POINT;
+        use windows::Win32::UI::WindowsAndMessaging::{
+            IsWindowVisible, WindowFromPoint, IsIconic, GetAncestor, GA_ROOT
+        };
+        use xcap::Window;
+
+        unsafe {
+            let point = POINT { x, y };
+
+            // Get the top-most visible window at this point
+            let mut hwnd = WindowFromPoint(point);
+
+            if hwnd.is_invalid() {
+                return Ok(None);
+            }
+
+            // Get the root window (not a child control)
+            hwnd = GetAncestor(hwnd, GA_ROOT);
+
+            if hwnd.is_invalid() {
+                return Ok(None);
+            }
+
+            // Skip if not visible or minimized
+            if !IsWindowVisible(hwnd).as_bool() || IsIconic(hwnd).as_bool() {
+                return Ok(None);
+            }
+
+            let window_id = hwnd.0 as u32;
+
+            // Try to find this window in xcap's window list to get full details
+            let all_windows = Window::all().map_err(|e| e.to_string())?;
+
+            // Get Z-order map to check if this window is covered by others
+            let z_order_map = get_window_z_order_map();
+
+            for window in &all_windows {
+                if window.id() == window_id {
+                    // Skip minimized windows
+                    if window.is_minimized() {
+                        return Ok(None);
+                    }
+
+                    // Skip windows with invalid dimensions
+                    if window.width() == 0 || window.height() == 0 {
+                        return Ok(None);
+                    }
+
+                    let title = window.title();
+                    let app_name = window.app_name();
+
+                    // Filter out system/overlay windows
+                    let title_lower = title.to_lowercase();
+                    let app_lower = app_name.to_lowercase();
+
+                    if title_lower == "program manager"
+                        || title_lower == "default ime"
+                        || title_lower.contains("overlay")
+                        || app_lower.contains("justsnap")
+                        || title_lower.contains("justsnap") {
+                        return Ok(None);
+                    }
+
+                    // STRICT RULE: Check if this window is covered by any other window
+                    // If any part is covered, reject it entirely
+                    let current_z = z_order_map.get(&window_id).copied().unwrap_or(i32::MAX);
+                    let current_rect = (window.x(), window.y(), window.width() as i32, window.height() as i32);
+
+                    // Check all other windows
+                    for other_window in &all_windows {
+                        if other_window.id() == window_id {
+                            continue; // Skip self
+                        }
+
+                        // Skip minimized/invalid windows
+                        if other_window.is_minimized() || other_window.width() == 0 || other_window.height() == 0 {
+                            continue;
+                        }
+
+                        // Get other window's Z-order
+                        let other_z = z_order_map.get(&other_window.id()).copied().unwrap_or(i32::MAX);
+
+                        // If other window is above us (lower z-order = higher in stack)
+                        if other_z < current_z {
+                            // Check if rectangles overlap
+                            let other_rect = (
+                                other_window.x(),
+                                other_window.y(),
+                                other_window.width() as i32,
+                                other_window.height() as i32,
+                            );
+
+                            if rectangles_intersect(current_rect, other_rect) {
+                                // This window is partially covered - reject it!
+                                return Ok(None);
+                            }
+                        }
+                    }
+
+                    // Window is not covered by any other window - allow selection
+                    return Ok(Some(WindowInfo {
+                        id: window_id,
+                        title: title.to_string(),
+                        app_name: app_name.to_string(),
+                        x: window.x(),
+                        y: window.y(),
+                        width: window.width(),
+                        height: window.height(),
+                        z_order: current_z,
+                    }));
+                }
+            }
+
+            // Window not found in xcap list
+            Ok(None)
+        }
+    }
+
+    #[cfg(not(windows))]
+    {
+        Ok(None)
+    }
 }
 
 #[command]
@@ -327,26 +541,45 @@ pub async fn get_windows() -> Result<Vec<WindowInfo>, String> {
 
     let windows = Window::all().map_err(|e| e.to_string())?;
 
+    // Get Z-order map (Windows API provides true Z-order)
+    let z_order_map = get_window_z_order_map();
+
     let mut window_infos = Vec::new();
+    let mut fallback_z_order = 0;
+
     for window in windows {
-        // Filter out minimized or invalid windows if possible
-        // Removed !is_minimized() as it might be flaky for some apps or during focus changes
+        // Skip minimized windows
+        if window.is_minimized() {
+            continue;
+        }
+
+        // Minimal filtering: Just ensure it has dimensions.
         if window.width() > 0 && window.height() > 0 {
             let title = window.title();
-            // Filter out our own windows to prevent self-selection/overlay issues
-            // We allow empty titles because many modern apps/dialogs have no title but are valid top-layer windows
-            if !title.contains("JustSnap") && !title.contains("justsnap") {
-                window_infos.push(WindowInfo {
-                    id: window.id(),
-                    title: title.to_string(),
-                    x: window.x(),
-                    y: window.y(),
-                    width: window.width(),
-                    height: window.height(),
-                });
-            }
+            let app_name = window.app_name();
+            let window_id = window.id();
+
+            // Get Z-order from map, or use fallback (enumeration order)
+            let z_order = z_order_map.get(&window_id).copied().unwrap_or_else(|| {
+                fallback_z_order += 1;
+                fallback_z_order - 1
+            });
+
+            window_infos.push(WindowInfo {
+                id: window_id,
+                title: title.to_string(),
+                app_name: app_name.to_string(),
+                x: window.x(),
+                y: window.y(),
+                width: window.width(),
+                height: window.height(),
+                z_order,
+            });
         }
     }
+
+    // Sort by Z-order (lower number = top-most window)
+    window_infos.sort_by_key(|w| w.z_order);
 
     Ok(window_infos)
 }

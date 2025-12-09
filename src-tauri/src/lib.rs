@@ -110,6 +110,7 @@ pub fn run() {
             commands::create_translation_window,
             commands::close_window,
             commands::get_windows,
+            commands::get_window_at_point,
         ])
         // generate_context!() : Loads config from: tauri.conf.json and Cargo.toml
         .run(tauri::generate_context!())
