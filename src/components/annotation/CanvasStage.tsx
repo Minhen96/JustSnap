@@ -1,7 +1,7 @@
 // JustSnap - Konva Canvas Stage for Annotations
 // Reference: use_case.md lines 64-93 (Screen Capture toolbar)
 
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useCallback } from 'react';
 import { Stage, Layer, Image as KonvaImage, Line, Rect, Ellipse, Arrow, Text } from 'react-konva';
 import type Konva from 'konva';
 import type { Annotation, AnnotationTool, AnnotationStyle } from '../../types';
@@ -44,6 +44,11 @@ export function CanvasStage({
       // Store stage ref for export purposes
       (window as any).__konvaStage = stageRef.current;
     }
+
+    // Cleanup on unmount
+    return () => {
+      (window as any).__konvaStage = undefined;
+    };
   }, []);
 
   // Load the screenshot image
@@ -52,6 +57,14 @@ export function CanvasStage({
     img.src = imageUrl;
     img.onload = () => {
       setImage(img);
+    };
+
+    // Cleanup on unmount or when imageUrl changes
+    return () => {
+      img.onload = null;
+      img.onerror = null;
+      // Clear src to help garbage collection
+      img.src = '';
     };
   }, [imageUrl]);
 
@@ -64,12 +77,14 @@ export function CanvasStage({
 
   // Debug logging for text input state
   useEffect(() => {
-    console.log('[Text Input State]', {
-      editingTextId,
-      textPosition,
-      textInput,
-      shouldShow: !!(editingTextId && textPosition)
-    });
+    if (import.meta.env.DEV) {
+      console.log('[Text Input State]', {
+        editingTextId,
+        textPosition,
+        textInput,
+        shouldShow: !!(editingTextId && textPosition)
+      });
+    }
   }, [editingTextId, textPosition, textInput]);
 
   // Global keyboard listener for text tool
@@ -77,8 +92,10 @@ export function CanvasStage({
     if (!editingTextId || currentTool !== 'text') return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      console.log('[Global Keyboard] Key:', e.key);
-      
+      if (import.meta.env.DEV) {
+        console.log('[Global Keyboard] Key:', e.key);
+      }
+
       // Prevent this event from reaching parent shortcuts
       e.stopPropagation();
       
@@ -109,7 +126,9 @@ export function CanvasStage({
     if (currentTool !== 'text' && editingTextId) {
       if (textPosition && textInput.trim()) {
         // Commit the text if there's actual content
-        console.log('[Text Tool] Auto-committing text due to tool change');
+        if (import.meta.env.DEV) {
+          console.log('[Text Tool] Auto-committing text due to tool change');
+        }
         const newAnnotation: Annotation = {
           id: crypto.randomUUID(),
           tool: 'text',
@@ -121,7 +140,9 @@ export function CanvasStage({
         onAddAnnotation(newAnnotation);
       } else {
         // Just clear the state if no text was typed
-        console.log('[Text Tool] Clearing empty text due to tool change');
+        if (import.meta.env.DEV) {
+          console.log('[Text Tool] Clearing empty text due to tool change');
+        }
       }
       setEditingTextId(null);
       setTextInput('');
@@ -148,8 +169,10 @@ export function CanvasStage({
 
     // Special handling for text tool - click to place
     if (currentTool === 'text') {
-      console.log('[Text Tool] Clicked at:', pos);
-      
+      if (import.meta.env.DEV) {
+        console.log('[Text Tool] Clicked at:', pos);
+      }
+
       // If there's existing text being edited, commit it first
       if (editingTextId && textPosition && textInput.trim()) {
         const newAnnotation: Annotation = {
@@ -167,7 +190,9 @@ export function CanvasStage({
       setTextPosition({ x: pos.x, y: pos.y });
       setTextInput('');
       setEditingTextId('new');
-      console.log('[Text Tool] State set, should show input');
+      if (import.meta.env.DEV) {
+        console.log('[Text Tool] State set, should show input');
+      }
       return;
     }
 
@@ -271,8 +296,8 @@ export function CanvasStage({
     setTextPosition(null);
   };
 
-  // Render individual annotation
-  const renderAnnotation = (annotation: Annotation) => {
+  // Render individual annotation (memoized to prevent re-creation on every render)
+  const renderAnnotation = useCallback((annotation: Annotation) => {
     const { id, tool, style, x = 0, y = 0, width = 0, height = 0, points = [], text = '' } = annotation;
     const { color, strokeWidth, opacity = 1 } = style;
 
@@ -347,28 +372,19 @@ export function CanvasStage({
         );
 
       case 'blur':
-        // Create a pixelated/mosaic blur effect
-        const pixelSize = 10; // Size of each pixel block
-        const rects = [];
-        
-        for (let i = 0; i < Math.abs(width); i += pixelSize) {
-          for (let j = 0; j < Math.abs(height); j += pixelSize) {
-            rects.push(
-              <Rect
-                key={`${id}-${i}-${j}`}
-                x={x + i}
-                y={y + j}
-                width={pixelSize}
-                height={pixelSize}
-                fill="#000000"
-                opacity={0.7}
-                stroke="#000000"
-                strokeWidth={0.5}
-              />
-            );
-          }
-        }
-        return <>{rects}</>;
+        // Optimized blur effect using a single semi-transparent rectangle
+        // This replaces hundreds of individual rects with just one
+        return (
+          <Rect
+            key={id}
+            x={x}
+            y={y}
+            width={width}
+            height={height}
+            fill="#000000"
+            opacity={0.8}
+          />
+        );
 
       case 'text':
         return (
@@ -387,7 +403,25 @@ export function CanvasStage({
       default:
         return null;
     }
-  };
+  }, []); // Empty deps - function doesn't depend on any props or state
+
+  // Get device pixel ratio for high-DPI displays
+  const pixelRatio = window.devicePixelRatio || 1;
+
+  // Configure canvas context for maximum quality
+  useEffect(() => {
+    if (stageRef.current) {
+      const canvas = stageRef.current.getStage().container().querySelector('canvas');
+      if (canvas) {
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          // Set highest quality rendering hints
+          ctx.imageSmoothingQuality = 'high';
+          ctx.imageSmoothingEnabled = true;
+        }
+      }
+    }
+  }, [image]);
 
   return (
     <div style={{ position: 'relative' }}>
@@ -395,17 +429,30 @@ export function CanvasStage({
         ref={stageRef}
         width={width}
         height={height}
+        // Scale for high-DPI displays to ensure crisp rendering
+        scaleX={1}
+        scaleY={1}
+        // Use actual device pixel ratio for retina displays
+        pixelRatio={pixelRatio}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
       >
-        <Layer>
+        <Layer
+          // Force high quality rendering
+          imageSmoothingEnabled={true}
+        >
           {/* Background screenshot image */}
           {image && (
             <KonvaImage
               image={image}
               width={width}
               height={height}
+              // Maximum quality image rendering
+              imageSmoothingEnabled={true}
+              // Prevent blurriness from fractional positioning
+              x={Math.round(0)}
+              y={Math.round(0)}
             />
           )}
 

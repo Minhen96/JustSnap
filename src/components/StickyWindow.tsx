@@ -15,6 +15,8 @@ export function StickyWindow() {
   const [aspectRatio, setAspectRatio] = useState<number>(1);
   const [dimensions, setDimensions] = useState<Dimensions>({ width: 0, height: 0 });
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [imageNaturalSize, setImageNaturalSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
+  const [scaleFactor, setScaleFactor] = useState<number>(1);
 
   useEffect(() => {
     // 1. Get the injected image data URL
@@ -27,11 +29,25 @@ export function StickyWindow() {
        
        const img = new Image();
        img.onload = () => {
-           console.log("Sticky Image Loaded:", img.width, img.height);
-           setAspectRatio(img.width / img.height);
            const w = window.innerWidth;
            const h = window.innerHeight;
+           const scaleX = w / img.width;
+           const scaleY = h / img.height;
+           const scale = Math.min(scaleX, scaleY);
+
+           if (import.meta.env.DEV) {
+               console.log("━━━ Sticky Image Quality Debug ━━━");
+               console.log("Image natural size:", img.width, "x", img.height);
+               console.log("Window size:", w, "x", h);
+               console.log("Scale factor:", scale.toFixed(2) + "x");
+               console.log("Rendering mode:", scale <= 1.0 ? "crisp-edges" : "high-quality");
+               console.log("Quality:", scale === 1.0 ? "PERFECT 1:1" : scale < 1.0 ? "Downscaled" : "Upscaled (blur possible)");
+           }
+
+           setImageNaturalSize({ width: img.width, height: img.height });
+           setAspectRatio(img.width / img.height);
            setDimensions({ width: w, height: h });
+           setScaleFactor(scale);
        };
        img.onerror = (e) => {
            console.error("Sticky Image Failed:", e);
@@ -46,9 +62,16 @@ export function StickyWindow() {
     const handleResize = async () => {
         const width = window.innerWidth;
         const height = window.innerHeight;
-        
+
         // Immediate fill
         setDimensions({ width, height });
+
+        // Recalculate scale factor for rendering quality adjustment
+        if (imageNaturalSize.width > 0) {
+            const scaleX = width / imageNaturalSize.width;
+            const scaleY = height / imageNaturalSize.height;
+            setScaleFactor(Math.min(scaleX, scaleY));
+        }
 
         const currentRatio = width / height;
 
@@ -176,10 +199,28 @@ export function StickyWindow() {
         onMouseLeave={() => setIsHovered(false)}
     >
         {/* Main Image Layer */}
-        <img 
-            src={imagePath} 
+        <img
+            src={imagePath}
             alt="Sticky"
-            className="absolute top-0 left-0 w-full h-full object-fill select-none pointer-events-none"
+            className="absolute top-0 left-0 w-full h-full object-contain select-none pointer-events-none"
+            style={{
+              // Adaptive rendering based on scale:
+              // - At 1:1 or smaller: Use crisp-edges (pixel-perfect)
+              // - When scaled up: Use high-quality smoothing
+              imageRendering: scaleFactor <= 1.0 ? 'crisp-edges' : 'high-quality',
+              WebkitFontSmoothing: 'antialiased',
+              // Dynamic sharpening - more at larger scales
+              filter: scaleFactor > 1.2
+                ? 'contrast(1.02) saturate(1.08) brightness(1.01)'  // Scaled up: more sharpening
+                : 'contrast(1.01) saturate(1.05)',                   // Normal: subtle
+              // Prevent subpixel rendering issues
+              transform: 'translateZ(0)',
+              backfaceVisibility: 'hidden',
+              // Force GPU acceleration for crisp rendering
+              willChange: 'transform',
+            } as React.CSSProperties}
+            // Prevent browser image interpolation quality loss
+            draggable={false}
         />
         
         {/* Drag Overlay - Middle Layer */}

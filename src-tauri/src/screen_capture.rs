@@ -114,12 +114,29 @@ fn crop_image(image: &RgbaImage, region: CaptureRegion) -> Result<RgbaImage, Str
     Ok(cropped)
 }
 
-/// Encode an image as PNG bytes
+/// Encode an image as PNG bytes with optimal compression
 fn encode_as_png(image: &RgbaImage) -> Result<Vec<u8>, String> {
+    use image::codecs::png::{PngEncoder, CompressionType, FilterType};
+    use image::ImageEncoder;
+
     let mut buffer = Cursor::new(Vec::new());
 
-    image
-        .write_to(&mut buffer, ImageFormat::Png)
+    // Use PNG encoder with best quality settings:
+    // - CompressionType::Best: Highest compression quality (slower but better quality)
+    // - FilterType::Sub: Good filter for photographic images
+    let encoder = PngEncoder::new_with_quality(
+        &mut buffer,
+        CompressionType::Best,
+        FilterType::Sub,
+    );
+
+    encoder
+        .write_image(
+            image.as_raw(),
+            image.width(),
+            image.height(),
+            image::ExtendedColorType::Rgba8,
+        )
         .map_err(|e| format!("Failed to encode image as PNG: {}", e))?;
 
     Ok(buffer.into_inner())

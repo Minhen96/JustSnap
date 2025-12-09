@@ -1,11 +1,13 @@
-import { StrictMode, useEffect, useState } from 'react'
+import { StrictMode, useEffect, useState, lazy, Suspense } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
-import { StickyWindow } from './components/StickyWindow.tsx'
-import { AIPanelWindow } from './components/AIPanelWindow.tsx'
-import { TranslationWindow } from './components/TranslationWindow.tsx'
 import { getCurrentWindow } from '@tauri-apps/api/window'
+
+// Lazy load window components - each window only loads its necessary code
+const StickyWindow = lazy(() => import('./components/StickyWindow.tsx').then(m => ({ default: m.StickyWindow })));
+const AIPanelWindow = lazy(() => import('./components/AIPanelWindow.tsx').then(m => ({ default: m.AIPanelWindow })));
+const TranslationWindow = lazy(() => import('./components/TranslationWindow.tsx').then(m => ({ default: m.TranslationWindow })));
 
 type WindowType = 'app' | 'sticky' | 'ai_panel' | 'translation_panel';
 
@@ -65,10 +67,31 @@ function Root() {
   // Don't render until we know what type of window this is
   if (!ready) return null;
 
-  // Render appropriate component based on window type
-  if (windowType === 'ai_panel') return <AIPanelWindow />;
-  if (windowType === 'translation_panel') return <TranslationWindow />;
-  if (windowType === 'sticky') return <StickyWindow />;
+  // Render appropriate component based on window type with lazy loading
+  // This ensures each window only loads its necessary code bundle
+  if (windowType === 'ai_panel') {
+    return (
+      <Suspense fallback={null}>
+        <AIPanelWindow />
+      </Suspense>
+    );
+  }
+
+  if (windowType === 'translation_panel') {
+    return (
+      <Suspense fallback={null}>
+        <TranslationWindow />
+      </Suspense>
+    );
+  }
+
+  if (windowType === 'sticky') {
+    return (
+      <Suspense fallback={null}>
+        <StickyWindow />
+      </Suspense>
+    );
+  }
 
   return <App />;
 }

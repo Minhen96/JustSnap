@@ -25,15 +25,78 @@ const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 const buildImageDataUrl = (imageBase64: string) =>
   imageBase64.startsWith('data:') ? imageBase64 : `data:image/png;base64,${imageBase64}`;
 
+// Simple in-memory cache for AI responses
+// Cache key: hash of (imageBase64 + promptText)
+// This prevents duplicate API calls for the same image+prompt combination
+const responseCache = new Map<string, string>();
+const CACHE_MAX_SIZE = 50; // Limit cache size to prevent memory issues
+
+/**
+ * Generate a cache key from image and prompt
+ */
+function getCacheKey(imageBase64: string, promptText: string): string {
+  // Simple hash: combine first 100 chars of image + prompt
+  const imagePrefix = imageBase64.substring(0, 100);
+  const combined = `${imagePrefix}::${promptText}`;
+  // Use a simple string hash
+  let hash = 0;
+  for (let i = 0; i < combined.length; i++) {
+    const char = combined.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return hash.toString(36);
+}
+
+/**
+ * Get cached response if available
+ */
+function getCachedResponse(imageBase64: string, promptText: string): string | null {
+  const key = getCacheKey(imageBase64, promptText);
+  return responseCache.get(key) || null;
+}
+
+/**
+ * Cache a response (with size limit)
+ */
+function cacheResponse(imageBase64: string, promptText: string, response: string): void {
+  const key = getCacheKey(imageBase64, promptText);
+
+  // If cache is full, remove oldest entry (first entry in Map)
+  if (responseCache.size >= CACHE_MAX_SIZE) {
+    const firstKey = responseCache.keys().next().value;
+    if (firstKey) {
+      responseCache.delete(firstKey);
+    }
+  }
+
+  responseCache.set(key, response);
+}
+
 /**
  * Generic helper to call AI with image and text prompt
  * Reduces boilerplate for multimodal requests
+ * Now includes automatic response caching
  */
 async function callAiWithImage<T = string>(
   imageBase64: string,
   promptText: string,
   parseResponse?: (raw: string) => T
 ): Promise<T> {
+  // Check cache first
+  const cachedResponse = getCachedResponse(imageBase64, promptText);
+  if (cachedResponse) {
+    if (import.meta.env.DEV) {
+      console.log('[AI Cache] Cache hit for prompt:', promptText.substring(0, 50));
+    }
+    return parseResponse ? parseResponse(cachedResponse) : cachedResponse as T;
+  }
+
+  // Cache miss - make API call
+  if (import.meta.env.DEV) {
+    console.log('[AI Cache] Cache miss for prompt:', promptText.substring(0, 50));
+  }
+
   const messages: OpenAIMessage[] = [
     {
       role: 'user',
@@ -45,6 +108,9 @@ async function callAiWithImage<T = string>(
   ];
 
   const rawResponse = await callAiChat(messages);
+
+  // Cache the raw response
+  cacheResponse(imageBase64, promptText, rawResponse);
 
   if (parseResponse) {
     return parseResponse(rawResponse);

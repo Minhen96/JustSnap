@@ -24,16 +24,35 @@ export function useScreenshotActions({
   onFeedback,
   onClose,
 }: ScreenshotActionsProps) {
-  const exportCanvasAsDataURL = (): string => {
+  const exportCanvasAsDataURL = (useMaxQuality: boolean = false): string => {
     const stage = window.__konvaStage;
     if (stage) {
-      return stage.toDataURL({ pixelRatio: 2 });
+      const devicePixelRatio = window.devicePixelRatio || 1;
+
+      // For sticky windows without annotations, we use original
+      // For copy/save/with annotations, use appropriate quality
+      let pixelRatio: number;
+      if (useMaxQuality) {
+        // Maximum quality for save/copy operations
+        const supersamplingRatio = 4;
+        pixelRatio = Math.max(devicePixelRatio * 2, supersamplingRatio);
+      } else {
+        // For sticky with annotations, use 2x to balance quality and file size
+        // This prevents the "too much compression" issue from 4x exports
+        pixelRatio = Math.max(devicePixelRatio, 2);
+      }
+
+      return stage.toDataURL({
+        pixelRatio,
+        mimeType: 'image/png',
+        quality: 1.0
+      });
     }
     return screenshot.imageData || '';
   };
 
   const handleCopy = async () => {
-    const dataURL = exportCanvasAsDataURL();
+    const dataURL = exportCanvasAsDataURL(true); // Use max quality for copy
 
     await hideImmediatelyThenPerform(
       async () => {
@@ -69,7 +88,7 @@ export function useScreenshotActions({
   };
 
   const handleSave = async () => {
-    const dataURL = exportCanvasAsDataURL();
+    const dataURL = exportCanvasAsDataURL(true); // Use max quality for save
 
     // Convert to bytes immediately (before hiding)
     const response = await fetch(dataURL);
@@ -97,12 +116,25 @@ export function useScreenshotActions({
   const handleStick = async () => {
     if (!screenshot) return;
 
-    const dataURL = exportCanvasAsDataURL();
     const { x, y } = screenshot.region;
+
+    // Check if there are annotations - if yes, export canvas; if no, use original
+    const stage = window.__konvaStage;
+    const hasAnnotations = stage && stage.find('Line, Rect, Ellipse, Arrow, Text').length > 0;
+
+    let imageDataURL: string;
+    if (hasAnnotations) {
+      // Has annotations - must export canvas to include them
+      imageDataURL = exportCanvasAsDataURL();
+    } else {
+      // No annotations - use ORIGINAL high-quality screenshot directly!
+      // This bypasses canvas recompression and preserves original quality
+      imageDataURL = screenshot.imageData;
+    }
 
     await hideImmediatelyThenPerform(
       async () => {
-        await ipc.createStickyWindow(dataURL, x, y, width, height);
+        await ipc.createStickyWindow(imageDataURL, x, y, width, height);
       },
       () => onClose(),
       (error) => console.error('Stick failed', error)
