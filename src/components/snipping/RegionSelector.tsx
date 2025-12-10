@@ -440,8 +440,12 @@ export function RegionSelector({ onDragStart }: RegionSelectorProps = {}) {
     // Outer full screen
     let path = `M 0 0 H ${w} V ${h} H 0 Z`;
 
-    if (currentRegion) {
-      const { x, y, width, height } = currentRegion;
+    // Determine which region to cut out (prioritize drag selection)
+    // If we have a smart-selected window and we aren't dragging, cut it out too
+    const activeRegion = currentRegion || (highlightedWindow && !isDragging ? highlightedWindow : null);
+
+    if (activeRegion) {
+      const { x, y, width, height } = activeRegion;
       // Inner hole (counter-clockwise)
       path += ` M ${x} ${y} V ${y + height} H ${x + width} V ${y} Z`;
     }
