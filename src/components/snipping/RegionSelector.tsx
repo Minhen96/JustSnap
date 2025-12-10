@@ -43,6 +43,7 @@ export function RegionSelector({ onDragStart }: RegionSelectorProps = {}) {
   const lastCheckRef = useRef<{ x: number; y: number; time: number } | null>(null);
   const lastWindowIdRef = useRef<number | null>(null);
   const callIdRef = useRef<number>(0); // Track API call order to prevent race conditions
+  const isCheckingWindowRef = useRef<boolean>(false); // Prevent overlapping window detection calls
 
   // Handle mouse down - initiate tracking
   // We attach this to the global window as well to catch edge clicks
@@ -69,10 +70,16 @@ export function RegionSelector({ onDragStart }: RegionSelectorProps = {}) {
     };
     enforceFullscreen();
 
+    // Force crosshair cursor on document body only (not all elements)
+    const previousCursor = document.body.style.cursor;
+    document.body.style.cursor = 'crosshair';
+
     // Attach global mousedown listener to catch edge clicks that React might miss
     window.addEventListener('mousedown', handleMouseDown);
     return () => {
         window.removeEventListener('mousedown', handleMouseDown);
+        // Restore previous cursor
+        document.body.style.cursor = previousCursor;
     };
   }, []);
 
@@ -112,8 +119,8 @@ export function RegionSelector({ onDragStart }: RegionSelectorProps = {}) {
         return;
       }
 
-      // Throttle API calls: only check every 30ms or if moved >5px
-      // Reduced throttle for better responsiveness when crossing window boundaries
+      // Very aggressive throttle: only check every 250ms or if moved >30px
+      // This minimizes cursor flickering from cursor event toggles
       const now = Date.now();
       const last = lastCheckRef.current;
 
@@ -121,33 +128,39 @@ export function RegionSelector({ onDragStart }: RegionSelectorProps = {}) {
         const timeDiff = now - last.time;
         const distDiff = Math.sqrt(Math.pow(clientX - last.x, 2) + Math.pow(clientY - last.y, 2));
 
-        if (timeDiff < 30 && distDiff < 5) {
+        if (timeDiff < 250 && distDiff < 30) {
           return; // Skip this check
         }
       }
 
       lastCheckRef.current = { x: clientX, y: clientY, time: now };
 
+      // Skip if a window detection is already in progress
+      if (isCheckingWindowRef.current) {
+        return;
+      }
+
       // Increment call ID to track this specific request
       const currentCallId = ++callIdRef.current;
 
       // Use async IIFE to avoid blocking
       (async () => {
+        // Mark as checking to prevent overlapping calls
+        isCheckingWindowRef.current = true;
+
+        const { invoke } = await import('@tauri-apps/api/core');
+        const { getCurrentWindow } = await import('@tauri-apps/api/window');
+        const tauriWindow = getCurrentWindow();
+
         try {
-          const { invoke } = await import('@tauri-apps/api/core');
-          const { getCurrentWindow } = await import('@tauri-apps/api/window');
           const scale = window.devicePixelRatio || 1;
 
           // Convert screen coordinates to physical pixels
           const physicalX = Math.round(clientX * scale);
           const physicalY = Math.round(clientY * scale);
 
-          // CRITICAL: Temporarily make overlay click-through so WindowFromPoint sees beneath us
-          const tauriWindow = getCurrentWindow();
+          // Temporarily make overlay click-through
           await tauriWindow.setIgnoreCursorEvents(true);
-
-          // Small delay to ensure window change is applied
-          await new Promise(resolve => setTimeout(resolve, 1));
 
           // Ask backend: "What window is visible at this exact point?"
           const windowAtPoint = await invoke<WindowInfo | null>('get_window_at_point', {
@@ -155,10 +168,7 @@ export function RegionSelector({ onDragStart }: RegionSelectorProps = {}) {
             y: physicalY,
           });
 
-          // Restore cursor events so we can capture clicks
-          await tauriWindow.setIgnoreCursorEvents(false);
-
-          // CRITICAL: Ignore stale responses (race condition prevention)
+          // Ignore stale responses
           if (currentCallId !== callIdRef.current) {
             return;
           }
@@ -173,8 +183,6 @@ export function RegionSelector({ onDragStart }: RegionSelectorProps = {}) {
               height: windowAtPoint.height / scale,
             };
 
-            // Always update the highlighted window to match what's under the cursor
-            // This ensures we never show a window that's been covered
             lastWindowIdRef.current = windowAtPoint.id;
             setHighlightedWindow(scaledWindow);
           } else {
@@ -183,10 +191,15 @@ export function RegionSelector({ onDragStart }: RegionSelectorProps = {}) {
           }
         } catch (e) {
           console.error('[Smart Select] Error:', e);
-          // Only clear if this is the latest call
           if (currentCallId === callIdRef.current) {
             setHighlightedWindow(null);
           }
+        } finally {
+          // ALWAYS restore cursor events
+          await tauriWindow.setIgnoreCursorEvents(false);
+
+          // Mark as done checking
+          isCheckingWindowRef.current = false;
         }
       })();
 

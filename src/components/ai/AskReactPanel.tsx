@@ -80,7 +80,7 @@ export function AskReactPanel({
     <div className="fixed inset-0 bg-white rounded-xl shadow-2xl border border-gray-100 z-50 flex flex-col pointer-events-auto overflow-hidden">
       <AIPanelHeader
         title={`Generate ${frameworkLabels[framework]} UI code`}
-        subtitle="Autosaved to desktop"
+        // subtitle="Autosaved to desktop"
         onClose={onClose}
       />
 

@@ -39,11 +39,20 @@ export function ScreenshotEditor() {
     if (!currentScreenshot) return;
 
     // Use original region dimensions
-    setDimensions({ 
-      width: currentScreenshot.region.width, 
-      height: currentScreenshot.region.height 
+    setDimensions({
+      width: currentScreenshot.region.width,
+      height: currentScreenshot.region.height
     });
   }, [currentScreenshot]);
+
+  // Reset cursor to default when editor mounts
+  useEffect(() => {
+    document.body.style.cursor = 'default';
+    return () => {
+      // Clean up on unmount
+      document.body.style.cursor = '';
+    };
+  }, []);
 
   const handleClose = async () => {
     await hideAndCleanup(() => {
