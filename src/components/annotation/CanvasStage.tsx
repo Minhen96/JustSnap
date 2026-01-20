@@ -26,7 +26,6 @@ export function CanvasStage({
   currentTool,
   currentStyle,
   onAddAnnotation,
-  onUpdateAnnotation,
   onTextEditingChange
 }: CanvasStageProps) {
   const [image, setImage] = useState<HTMLImageElement | null>(null);

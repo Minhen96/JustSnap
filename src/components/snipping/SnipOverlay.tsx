@@ -31,6 +31,7 @@ export function SnipOverlay() {
 
       {/* Mode Selector Bar - Top - Hide when selecting or processing */}
       {!isSelecting && !isProcessing && (
+
         <div className="absolute top-6 left-1/2 -translate-x-1/2 flex gap-2 bg-white rounded-lg shadow-2xl p-2 z-10 animate-slideDown">
         <ModeButton
           mode="capture"

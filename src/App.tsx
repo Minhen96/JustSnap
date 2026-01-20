@@ -37,6 +37,9 @@ function App() {
     document.body.style.overflow = 'hidden';
 
     const setup = async () => {
+      // DEBUG: Force clear screenshot on startup to prevent stuck Suspense
+      useAppStore.getState().clearScreenshot();
+      
       if (!isTauri) return;
 
       // Tauri Setup
@@ -65,6 +68,8 @@ function App() {
            try {
              // Backend handles window size/position/fullscreen
              await win.setFocus();
+             // Ensure window captures mouse events (fix for "can't click" issue)
+             await win.setIgnoreCursorEvents(false);
 
            } catch (err) {
              console.error('[App] Window setup failed:', err);
@@ -92,9 +97,21 @@ function App() {
            }
         });
 
+        // Handle race condition: If hotkey was pressed before we were ready
+        try {
+          const { getCurrentWindow } = await import('@tauri-apps/api/window');
+          const win = getCurrentWindow();
+          if (await win.isVisible()) {
+            console.log('[App] Window already visible - forcing capture mode');
+            useAppStore.getState().showOverlay('capture');
+          }
+        } catch (err) {
+          console.error('[App] Initial visibility check failed:', err);
+        }
 
       } catch (e) {
         console.error("Error: " + e);
+        alert("App Setup Error: " + e);
       }
     };
     setup();

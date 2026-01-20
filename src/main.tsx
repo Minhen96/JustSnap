@@ -4,6 +4,15 @@ import './index.css'
 import App from './App.tsx'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 
+// CRITICAL DEBUG: Global Error Handler
+window.onerror = function(message, source, lineno, colno, error) {
+  alert(`Global Error: ${message}\nSource: ${source}:${lineno}`);
+  return false;
+};
+window.onunhandledrejection = function(event) {
+  alert(`Unhandled Promise Rejection: ${event.reason}`);
+};
+
 // Lazy load window components - each window only loads its necessary code
 const StickyWindow = lazy(() => import('./components/window/StickyWindow.tsx').then(m => ({ default: m.StickyWindow })));
 const AIPanelWindow = lazy(() => import('./components/window/AIPanelWindow.tsx').then(m => ({ default: m.AIPanelWindow })));
@@ -61,7 +70,17 @@ function Root() {
       }
     };
 
-    detectWindowType();
+    // Race detection against a shorter timeout
+    const timeoutPromise = new Promise<void>((_, reject) => 
+       setTimeout(() => reject(new Error('Timeout')), 200)
+    );
+
+    Promise.race([detectWindowType(), timeoutPromise]).catch(() => {
+      // If detection fails or times out, we're likely the main app window
+      if (import.meta.env.DEV) console.log('[Main] Detection timeout, assuming "app" window');
+      setWindowType('app');
+      setReady(true);
+    });
   }, []);
 
   // Don't render until we know what type of window this is

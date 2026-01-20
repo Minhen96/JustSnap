@@ -11,7 +11,7 @@ import type { AskFramework } from '../../types';
 
 export function ScreenshotEditor() {
   const [showAskReact, setShowAskReact] = useState(false);
-  const [initialAskFramework, setInitialAskFramework] = useState<AskFramework>('react');
+  const [initialAskFramework] = useState<AskFramework>('react');
   const [askPanelImage, setAskPanelImage] = useState<string | null>(null);
   const currentScreenshot = useAppStore((state) => state.currentScreenshot);
   const clearScreenshot = useAppStore((state) => state.clearScreenshot);

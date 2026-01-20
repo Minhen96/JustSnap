@@ -24,7 +24,6 @@ export function AskReactPanel({
   const [userPrompt, setUserPrompt] = useState('');
 
   const {
-    generatedPrompt,
     codeResult,
     isPromptLoading,
     isCodeLoading,

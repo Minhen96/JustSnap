@@ -31,6 +31,7 @@ export function RegionSelector({ onDragStart }: RegionSelectorProps = {}) {
   const setOCRResult = useAppStore((state) => state.setOCRResult);
   const setOCRError = useAppStore((state) => state.setOCRError);
   const isSmartSelectActive = useAppStore((state) => state.isSmartSelectActive);
+  // const toggleSmartSelect = useAppStore((state) => state.toggleSmartSelect); // Removed from store
 
   const [isMouseDown, setIsMouseDown] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -54,6 +55,8 @@ export function RegionSelector({ onDragStart }: RegionSelectorProps = {}) {
     const clientX = e.clientX;
     const clientY = e.clientY;
     
+    if (import.meta.env.DEV) console.log('[RegionSelector] MouseDown', { clientX, clientY });
+
     setIsMouseDown(true);
     setStartPos({ x: clientX, y: clientY });
   };
