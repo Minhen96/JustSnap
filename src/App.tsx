@@ -2,7 +2,7 @@
 import { useEffect, useState, lazy, Suspense } from 'react';
 import { useAppStore } from './store/appStore';
 import { SnipOverlay } from './components/snipping/SnipOverlay';
-import { ErrorBoundary } from './components/ErrorBoundary';
+import { ErrorBoundary } from './components/window/ErrorBoundary';
 
 
 // Lazy load ScreenshotEditor to prevent initialization issues

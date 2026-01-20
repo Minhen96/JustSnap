@@ -2,9 +2,6 @@
 // Reference: tech_stack.md lines 92-109
 
 import type {
-  AISummary,
-  AICodeGeneration,
-  TranslationResult,
   AskFramework,
   AskFrameworkCodeResult,
   AskFrameworkPromptResult,
@@ -176,16 +173,6 @@ function safeParseJson<T>(raw: string): T {
     }
     throw new Error('Failed to parse JSON from AI response');
   }
-}
-
-/**
- * AI Chat - Ask questions about screenshot
- */
-export async function chatWithScreenshot(
-  imageBase64: string,
-  userMessage: string
-): Promise<string> {
-  return callAiWithImage(imageBase64, userMessage);
 }
 
 /**

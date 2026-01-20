@@ -105,9 +105,11 @@ export async function extractText(
   const result = await w.recognize(imageData);
   onProgress?.(100);
 
-  const rawText = result.data.text || '';
-  const lines = result.data.lines || [];
-  const paragraphs = result.data.paragraphs || [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const data: any = result.data;
+  const rawText = data.text || '';
+  const lines = data.lines || [];
+  const paragraphs = data.paragraphs || [];
 
   let finalText = '';
 
@@ -115,14 +117,14 @@ export async function extractText(
   if (lines.length > 0) {
     // If lines exist, process each line separately
     const processedLines = lines
-      .map(line => filterMeaningfulText(line.text || ''))
-      .filter(line => line.trim().length > 0);
+      .map((line: any) => filterMeaningfulText(line.text || ''))
+      .filter((line: string) => line.trim().length > 0);
     finalText = processedLines.join('\n');
   } else if (paragraphs.length > 0) {
     // If paragraphs exist, process each paragraph
     const processedParagraphs = paragraphs
-      .map(para => filterMeaningfulText(para.text || ''))
-      .filter(para => para.trim().length > 0);
+      .map((para: any) => filterMeaningfulText(para.text || ''))
+      .filter((para: string) => para.trim().length > 0);
     finalText = processedParagraphs.join('\n\n');
   } else {
     // Fallback: use raw text (already has line breaks from Tesseract)
@@ -139,11 +141,11 @@ export async function extractText(
     confidence: (result.data.confidence || 0) / 100,
     language: 'eng',
     blocks: lines
-      .map((line) => ({
+      .map((line: any) => ({
         text: line.text || '',
         bbox: line.bbox,
         confidence: line.confidence / 100,
       }))
-      .filter((block) => block.text.trim().length > 0),
+      .filter((block: any) => block.text.trim().length > 0),
   };
 }

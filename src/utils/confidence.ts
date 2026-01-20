@@ -24,17 +24,6 @@ export function getConfidenceLabel(confidence: number): string {
 }
 
 /**
- * Get complete badge class string for confidence display
- * Combines color classes with standard badge styling
- * @param confidence - Confidence score between 0 and 1
- * @returns Complete Tailwind class string for badge
- */
-export function getConfidenceBadgeClass(confidence: number): string {
-  const colorClasses = getConfidenceColor(confidence);
-  return `px-3 py-1 rounded-full text-xs font-medium ${colorClasses}`;
-}
-
-/**
  * Format confidence as percentage string
  * @param confidence - Confidence score between 0 and 1
  * @returns Formatted percentage (e.g., "85%")

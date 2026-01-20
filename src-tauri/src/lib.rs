@@ -4,7 +4,6 @@
 mod commands;
 mod hotkeys;
 mod screen_capture;
-mod utils;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -109,9 +108,7 @@ pub fn run() {
             commands::create_ai_panel_window,
             commands::create_translation_window,
             commands::close_window,
-            commands::get_windows,
             commands::get_window_at_point,
-            commands::get_cursor_position,
         ])
         // generate_context!() : Loads config from: tauri.conf.json and Cargo.toml
         .run(tauri::generate_context!())

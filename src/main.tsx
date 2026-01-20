@@ -5,9 +5,9 @@ import App from './App.tsx'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 
 // Lazy load window components - each window only loads its necessary code
-const StickyWindow = lazy(() => import('./components/StickyWindow.tsx').then(m => ({ default: m.StickyWindow })));
-const AIPanelWindow = lazy(() => import('./components/AIPanelWindow.tsx').then(m => ({ default: m.AIPanelWindow })));
-const TranslationWindow = lazy(() => import('./components/TranslationWindow.tsx').then(m => ({ default: m.TranslationWindow })));
+const StickyWindow = lazy(() => import('./components/window/StickyWindow.tsx').then(m => ({ default: m.StickyWindow })));
+const AIPanelWindow = lazy(() => import('./components/window/AIPanelWindow.tsx').then(m => ({ default: m.AIPanelWindow })));
+const TranslationWindow = lazy(() => import('./components/window/TranslationWindow.tsx').then(m => ({ default: m.TranslationWindow })));
 
 type WindowType = 'app' | 'sticky' | 'ai_panel' | 'translation_panel';
 

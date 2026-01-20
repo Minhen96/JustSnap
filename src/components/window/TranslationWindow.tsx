@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { TranslationPanel } from './ai/TranslationPanel';
+import { TranslationPanel } from '../ai/TranslationPanel';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
 export function TranslationWindow() {
@@ -47,7 +47,6 @@ export function TranslationWindow() {
       <TranslationPanel 
         onClose={handleClose} 
         initialText={data.text} 
-        isOverlay={false} 
       />
     </div>
   );

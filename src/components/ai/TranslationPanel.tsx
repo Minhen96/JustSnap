@@ -9,6 +9,8 @@ import { extractText } from '../../services/ocr.service';
 
 interface TranslationPanelProps {
   onClose: () => void;
+  initialText?: string;
+  isOverlay?: boolean;
 }
 
 const LANGUAGES: { code: TranslationLanguage; name: string; flag: string }[] = [
@@ -17,7 +19,9 @@ const LANGUAGES: { code: TranslationLanguage; name: string; flag: string }[] = [
   { code: 'ms', name: 'MY', flag: '🇲🇾' },
 ];
 
-export function TranslationPanel({ onClose }: TranslationPanelProps) {
+export function TranslationPanel({ onClose, initialText }: TranslationPanelProps) {
+  // isOverlay removed as unused, default behavior assumed
+
   const currentScreenshot = useAppStore((state) => state.currentScreenshot);
   const ocrResult = useAppStore((state) => state.ocrResult);
   const ocrLoading = useAppStore((state) => state.ocrLoading);
@@ -38,11 +42,22 @@ export function TranslationPanel({ onClose }: TranslationPanelProps) {
   const [selectedLanguage, setSelectedLanguage] = useState<TranslationLanguage>('en');
   const [copied, setCopied] = useState(false);
 
+  // Initialize with passed text if available
+  useEffect(() => {
+    if (initialText && !ocrResult) {
+       setOCRResult({
+           text: initialText,
+           confidence: 1,
+           language: 'eng'
+       });
+    }
+  }, [initialText, ocrResult, setOCRResult]);
+
   // Auto-trigger OCR if no text is available
   useEffect(() => {
     const runOCRIfNeeded = async () => {
-      // If we have no OCR result and we're not already loading, run OCR
-      if (!ocrResult && !ocrLoading && currentScreenshot?.imageData) {
+      // If we have no OCR result, no initial text, not loading, and have a screenshot
+      if (!ocrResult && !initialText && !ocrLoading && currentScreenshot?.imageData) {
         setOCRLoading(true);
         setOCRError(null);
 
@@ -59,7 +74,7 @@ export function TranslationPanel({ onClose }: TranslationPanelProps) {
     };
 
     runOCRIfNeeded();
-  }, [ocrResult, ocrLoading, currentScreenshot, setOCRLoading, setOCRProgress, setOCRResult, setOCRError]);
+  }, [ocrResult, ocrLoading, currentScreenshot, initialText, setOCRLoading, setOCRProgress, setOCRResult, setOCRError]);
 
   const handleTranslate = async () => {
     if (!ocrResult?.text) {
@@ -144,7 +159,7 @@ export function TranslationPanel({ onClose }: TranslationPanelProps) {
               {/* Source Text Preview */}
               <div className="bg-gray-50 border border-gray-200 rounded p-2 max-h-32 overflow-y-auto">
                 <p className="text-xs text-gray-600 whitespace-pre-wrap">
-                  {ocrResult.text}
+                  {ocrResult?.text}
                 </p>
               </div>
 

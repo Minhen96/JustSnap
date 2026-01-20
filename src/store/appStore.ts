@@ -17,7 +17,6 @@ interface AppState {
 
   // Screenshot state
   currentScreenshot: Screenshot | null;
-  screenshots: Screenshot[];
 
   // Annotation state
   currentTool: AnnotationTool;
@@ -56,7 +55,6 @@ interface AppState {
   // Actions - Screenshot
   setScreenshot: (screenshot: Screenshot) => void;
   clearScreenshot: () => void;
-  addToHistory: (screenshot: Screenshot) => void;
 
   // Actions - Annotation
   setTool: (tool: AnnotationTool) => void;
@@ -97,7 +95,6 @@ export const useAppStore = create<AppState>((set) => ({
   isSelecting: false,
   isSmartSelectActive: true, // Default ON
   currentScreenshot: null,
-  screenshots: [],
   currentTool: 'rectangle', // Default to rectangle
   annotations: [],
   annotationStyle: {
@@ -200,11 +197,6 @@ export const useAppStore = create<AppState>((set) => ({
       state.resetEditorState();
       return {};
     }),
-
-  addToHistory: (screenshot) =>
-    set((state) => ({
-      screenshots: [screenshot, ...state.screenshots].slice(0, 10), // Keep last 10
-    })),
 
   // Annotation actions
   setTool: (tool) => set({ currentTool: tool }),
@@ -342,10 +334,8 @@ export const useScreenshotState = () =>
   useAppStore(
     useShallow((state) => ({
       current: state.currentScreenshot,
-      history: state.screenshots,
       set: state.setScreenshot,
       clear: state.clearScreenshot,
-      addToHistory: state.addToHistory,
     }))
   );
 

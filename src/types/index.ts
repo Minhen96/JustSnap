@@ -119,19 +119,8 @@ export interface OpenAIMessage {
   content: OpenAIMessageContent;
 }
 
-// Unified framework type for all AI code generation features
-export type CodeFramework = 'react' | 'vue' | 'flutter' | 'html' | 'nextjs';
-
 // Subset used by Ask feature (currently supports these 3)
 export type AskFramework = 'react' | 'vue' | 'flutter';
-
-export interface AICodeGeneration {
-  framework: CodeFramework;
-  code: string;
-  styles?: string;
-  dependencies?: string[];
-  fileName: string;
-}
 
 export interface AskFrameworkPromptResult {
   framework: AskFramework;

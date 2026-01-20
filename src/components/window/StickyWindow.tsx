@@ -4,7 +4,7 @@ import { X, Copy, Save } from 'lucide-react';
 import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
 import { invoke } from '@tauri-apps/api/core';
 import { Stage, Layer, Line, Rect, Ellipse, Arrow, Text } from 'react-konva';
-import type { Annotation } from '../types';
+import type { Annotation } from '../../types';
 
 interface Dimensions {
   width: number;
@@ -73,7 +73,7 @@ export function StickyWindow() {
     }
 
     // 2. Setup Resize Listener (Same logic as ScreenshotEditor)
-    let resizeTimeout: NodeJS.Timeout;
+    let resizeTimeout: ReturnType<typeof setTimeout>;
     const handleResize = async () => {
         const width = window.innerWidth;
         const height = window.innerHeight;

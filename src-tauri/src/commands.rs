@@ -414,27 +414,7 @@ fn rectangles_intersect(
     !(right1 <= left2 || right2 <= left1 || bottom1 <= top2 || bottom2 <= top1)
 }
 
-#[command]
-pub async fn get_cursor_position() -> Result<(i32, i32), String> {
-    #[cfg(windows)]
-    {
-        use windows::Win32::Foundation::POINT;
-        use windows::Win32::UI::WindowsAndMessaging::GetCursorPos;
-
-        let mut point = POINT { x: 0, y: 0 };
-        unsafe {
-            if GetCursorPos(&mut point).is_ok() {
-                Ok((point.x, point.y))
-            } else {
-                Err("Failed to get cursor position".to_string())
-            }
-        }
-    }
-    #[cfg(not(windows))]
-    {
-        Ok((0, 0)) // Placeholder for other OS
-    }
-}
+// get_windows and get_cursor_position removed as they were unused by frontend
 
 // Get window at specific screen coordinates (WYSIWYG - what you see is what you get)
 #[command]
@@ -575,53 +555,4 @@ pub async fn get_window_at_point(x: i32, y: i32) -> Result<Option<WindowInfo>, S
     {
         Ok(None)
     }
-}
-
-#[command]
-pub async fn get_windows() -> Result<Vec<WindowInfo>, String> {
-    use xcap::Window;
-
-    let windows = Window::all().map_err(|e| e.to_string())?;
-
-    // Get Z-order map (Windows API provides true Z-order)
-    let z_order_map = get_window_z_order_map();
-
-    let mut window_infos = Vec::new();
-    let mut fallback_z_order = 0;
-
-    for window in windows {
-        // Skip minimized windows
-        if window.is_minimized() {
-            continue;
-        }
-
-        // Minimal filtering: Just ensure it has dimensions.
-        if window.width() > 0 && window.height() > 0 {
-            let title = window.title();
-            let app_name = window.app_name();
-            let window_id = window.id();
-
-            // Get Z-order from map, or use fallback (enumeration order)
-            let z_order = z_order_map.get(&window_id).copied().unwrap_or_else(|| {
-                fallback_z_order += 1;
-                fallback_z_order - 1
-            });
-
-            window_infos.push(WindowInfo {
-                id: window_id,
-                title: title.to_string(),
-                app_name: app_name.to_string(),
-                x: window.x(),
-                y: window.y(),
-                width: window.width(),
-                height: window.height(),
-                z_order,
-            });
-        }
-    }
-
-    // Sort by Z-order (lower number = top-most window)
-    window_infos.sort_by_key(|w| w.z_order);
-
-    Ok(window_infos)
 }

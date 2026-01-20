@@ -2,10 +2,10 @@
 // Displays generated code with copy functionality
 
 import { useState } from 'react';
-import type { CodeResult } from '../../types';
+import type { AskFrameworkCodeResult } from '../../types';
 
 interface CodeOutputProps {
-  codeResult: CodeResult;
+  codeResult: AskFrameworkCodeResult;
   frameworkLabel: string;
 }
 
