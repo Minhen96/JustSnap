@@ -99,7 +99,7 @@ pub fn run() {
             commands::hide_overlay,
             // File System
             commands::save_image,
-            commands::save_text,
+            // commands::save_text,
             commands::open_save_dialog,
             // Clipboard
             commands::copy_image_to_clipboard,

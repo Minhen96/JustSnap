@@ -14,6 +14,7 @@ declare global {
 
     // Window-specific data injected by Rust commands
     __STICKY_IMAGE_SRC__?: string;
+    __STICKY_ANNOTATIONS__?: string; // JSON string of annotations
     __AI_PANEL_DATA__?: {
       imageSrc: string;
       framework: string;
@@ -23,4 +24,4 @@ declare global {
   }
 }
 
-export {};
+export { };

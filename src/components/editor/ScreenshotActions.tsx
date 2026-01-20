@@ -3,8 +3,9 @@
 
 import { currentMonitor } from '@tauri-apps/api/window';
 import type { Screenshot, AskFramework } from '../../types';
+import { useAppStore } from '../../store/appStore';
 import * as ipc from '../../services/ipc.service';
-import { hideAndCleanup, hideImmediatelyThenPerform, hidePerformShowFeedback } from '../../utils/windowManager';
+import { hideImmediatelyThenPerform, hidePerformShowFeedback } from '../../utils/windowManager';
 
 interface ScreenshotActionsProps {
   screenshot: Screenshot;
@@ -118,23 +119,30 @@ export function useScreenshotActions({
 
     const { x, y } = screenshot.region;
 
-    // Check if there are annotations - if yes, export canvas; if no, use original
-    const stage = window.__konvaStage;
-    const hasAnnotations = stage && stage.find('Line, Rect, Ellipse, Arrow, Text').length > 0;
-
-    let imageDataURL: string;
-    if (hasAnnotations) {
-      // Has annotations - must export canvas to include them
-      imageDataURL = exportCanvasAsDataURL();
-    } else {
-      // No annotations - use ORIGINAL high-quality screenshot directly!
-      // This bypasses canvas recompression and preserves original quality
-      imageDataURL = screenshot.imageData;
-    }
+    // Use the ORIGINAL high-quality screenshot directly!
+    // We now pass annotations separately to simple sticky windows
+    const imageDataURL = screenshot.imageData;
+    
+    // Get annotations from store (source of truth)
+    // We need to import useAppStore first, but to avoid large refactor we can use getState directly if needed
+    // or better, adds import at top. 
+    // For now, let's assume we can access the store state via the window (hacky) or just import it.
+    // Let's rely on the module import added at the top.
+    
+    // Actually, I need to add the import. I'll do that in a separate chunk or just use consistent store access.
+    // Let's pretend I added the import or I'll add access implementation here if I can.
+    // Since I can't add imports easily with replace_file_content if they are far away, 
+    // I will use `useAppStore` if I add the import.
+    // Or I can use `useAppStore.getState().annotations`?
+    
+    // Wait, I need to add the import first. 
+    // I will assume I will add `import { useAppStore } from '../../store/appStore';` at the top.
+    
+    const annotations = useAppStore.getState().annotations;
 
     await hideImmediatelyThenPerform(
       async () => {
-        await ipc.createStickyWindow(imageDataURL, x, y, width, height);
+        await ipc.createStickyWindow(imageDataURL, annotations, x, y, width, height);
       },
       () => onClose(),
       (error) => console.error('Stick failed', error)

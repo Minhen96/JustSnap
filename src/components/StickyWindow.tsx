@@ -3,7 +3,8 @@ import { useEffect, useState } from 'react';
 import { X, Copy, Save } from 'lucide-react';
 import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
 import { invoke } from '@tauri-apps/api/core';
-import { convertFileSrc } from '@tauri-apps/api/core';
+import { Stage, Layer, Line, Rect, Ellipse, Arrow, Text } from 'react-konva';
+import type { Annotation } from '../types';
 
 interface Dimensions {
   width: number;
@@ -16,7 +17,9 @@ export function StickyWindow() {
   const [dimensions, setDimensions] = useState<Dimensions>({ width: 0, height: 0 });
   const [feedback, setFeedback] = useState<string | null>(null);
   const [imageNaturalSize, setImageNaturalSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
+  const [initialDimensions, setInitialDimensions] = useState<Dimensions | null>(null);
   const [scaleFactor, setScaleFactor] = useState<number>(1);
+  const [annotations, setAnnotations] = useState<Annotation[]>([]);
 
   useEffect(() => {
     // 1. Get the injected image data URL
@@ -32,12 +35,17 @@ export function StickyWindow() {
            const w = window.innerWidth;
            const h = window.innerHeight;
            
+           // Store the initial logical dimensions (Scale 1.0 for annotations)
+           // If not set yet, set it now.
+           setInitialDimensions(prev => prev || { width: w, height: h });
+
            const dpr = window.devicePixelRatio || 1;
            const physicalWindowWidth = w * dpr;
            const physicalScale = physicalWindowWidth / img.width;
 
            if (import.meta.env.DEV) {
              console.log("Phys-to-Phys Scale:", physicalScale);
+             console.log("Initial Dimensions:", w, h);
            }
 
            setImageNaturalSize({ width: img.width, height: img.height });
@@ -51,6 +59,17 @@ export function StickyWindow() {
        img.src = src;
     } else {
        console.error("No sticky path found on window object");
+    }
+
+    // Load Annotations
+    try {
+      const annotationsJson = (window as any).__STICKY_ANNOTATIONS__;
+      if (annotationsJson) {
+        const parsed = JSON.parse(annotationsJson);
+        setAnnotations(parsed);
+      }
+    } catch (e) {
+      console.error("Failed to load sticky annotations:", e);
     }
 
     // 2. Setup Resize Listener (Same logic as ScreenshotEditor)
@@ -221,6 +240,30 @@ export function StickyWindow() {
       setTimeout(() => setFeedback(null), 2000);
   };
 
+  const renderAnnotation = (annotation: Annotation) => {
+    const { id, tool, style, x = 0, y = 0, width = 0, height = 0, points = [], text = '' } = annotation;
+    const { color, strokeWidth, opacity = 1 } = style;
+
+    switch (tool) {
+      case 'pen':
+        return <Line key={id} points={points} stroke={color} strokeWidth={strokeWidth} opacity={opacity} tension={0.5} lineCap="round" lineJoin="round" />;
+      case 'highlighter':
+        return <Line key={id} points={points} stroke={color} strokeWidth={strokeWidth * 3} opacity={0.3} tension={0.5} lineCap="round" lineJoin="round" />;
+      case 'rectangle':
+        return <Rect key={id} x={x} y={y} width={width} height={height} stroke={color} strokeWidth={strokeWidth} opacity={opacity} />;
+      case 'circle':
+        return <Ellipse key={id} x={x + width / 2} y={y + height / 2} radiusX={Math.abs(width) / 2} radiusY={Math.abs(height) / 2} stroke={color} strokeWidth={strokeWidth} opacity={opacity} />;
+      case 'arrow':
+        return <Arrow key={id} points={points} stroke={color} strokeWidth={strokeWidth} opacity={opacity} pointerLength={10} pointerWidth={10} />;
+      case 'blur':
+        return <Rect key={id} x={x} y={y} width={width} height={height} fill="#000000" opacity={0.8} />;
+      case 'text':
+        return <Text key={id} x={x} y={y} text={text} fontSize={24} fontFamily="Arial" fill={color} opacity={opacity} />;
+      default:
+        return null;
+    }
+  };
+
   if (!imagePath) return <div className="p-4 text-white">Loading Stick...</div>;
 
   return (
@@ -253,6 +296,22 @@ export function StickyWindow() {
             // Prevent browser image interpolation quality loss
             draggable={false}
         />
+
+        {/* Vector Annotation Layer - Overlaid on top */}
+        {annotations.length > 0 && dimensions.width > 0 && (
+          <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
+            <Stage
+               width={dimensions.width}
+               height={dimensions.height}
+               scaleX={initialDimensions ? dimensions.width / initialDimensions.width : 1}
+               scaleY={initialDimensions ? dimensions.height / initialDimensions.height : 1}
+            >
+              <Layer>
+                {annotations.map(renderAnnotation)}
+              </Layer>
+            </Stage>
+          </div>
+        )}
         
         {/* Drag Overlay - Middle Layer */}
         <div 

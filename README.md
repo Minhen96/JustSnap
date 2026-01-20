@@ -86,25 +86,25 @@
 # Install dependencies
 npm install
 
-# Run development server with hot reload
+# Run FULL development environment (Frontend + Backend)
+# there is only one port using in this project, backend launches the native application window that loads that URL.
+# > Starts web server on localhost:5177 (or configured port)
+# > Compiles Rust backend and opens native application window
 npm run tauri dev
+
+# Run Frontend ONLY (for quick UI development)
+# > Starts web server on localhost:5177
+# > Opens in browser
+# > NOTE: Native Tauri features (screen capture, etc.) will NOT work
+npm run dev
 
 # Build for production
 npm run tauri build
 
-# Run frontend only (for UI development)
-npm run dev
-
 # Lint code
 npm run lint
 
-# Tauri CLI commands (via npx)
-npx tauri dev        # Start dev server
-npx tauri build      # Build production app
-npx tauri info       # Show environment info
 ```
-
-**Note**: The Tauri CLI is included in the project's `devDependencies`, so you don't need to install it globally. All Tauri commands can be run via `npm run tauri` or `npx tauri`.
 
 ## Usage
 
@@ -192,12 +192,11 @@ After capturing a screenshot, access powerful AI features:
   - Context-aware screenshot analysis
 
 ### In Progress 🚧
+- [ ] **Multi monitor support**
 - [ ] **Enhanced Code Generation**: Improving code quality and accuracy
 - [ ] **Additional Export Formats**: Support for more image formats
-- [ ] **Text Annotation Tool**: Add text directly to screenshots
-- [ ] **Cloud Storage Integration**: Save screenshots to cloud services
-- [ ] **History & Gallery**: Browse and manage past screenshots
 - [ ] **Custom Hotkeys**: User-configurable keyboard shortcuts
+- [ ] **Long Screenshot**: Capture long screenshots
 - [ ] **Video Recording**: Capture screen recordings with annotations
 
 ## License

@@ -128,10 +128,10 @@ pub async fn save_image(path: String, image_data: Vec<u8>) -> Result<(), String>
 }
 
 // Note: save_text is currently unused but kept for future text export features
-#[command]
-pub async fn save_text(_content: String, file_name: String) -> Result<String, String> {
-    Ok(format!("C:\\Users\\Desktop\\{}.txt", file_name))
-}
+// #[command]
+// pub async fn save_text(_content: String, file_name: String) -> Result<String, String> {
+//     Ok(format!("C:\\Users\\Desktop\\{}.txt", file_name))
+// }
 
 #[command]
 pub async fn open_save_dialog(app: tauri::AppHandle) -> Result<Option<String>, String> {
@@ -213,7 +213,8 @@ pub async fn save_temp_image(image_data: Vec<u8>) -> Result<String, String> {
 #[command]
 pub async fn create_sticky_window(
     app: tauri::AppHandle,
-    image_src: String, // Expects full data URL or src
+    image_src: String,        // Expects full data URL or src
+    annotations_json: String, // JSON string of annotations
     x: f64,
     y: f64,
     width: f64,
@@ -225,8 +226,8 @@ pub async fn create_sticky_window(
 
     // Inject window type and image src
     let init_script = format!(
-        "window.__WINDOW_TYPE__ = 'sticky'; window.__STICKY_IMAGE_SRC__ = {:?};",
-        image_src
+        "window.__WINDOW_TYPE__ = 'sticky'; window.__STICKY_IMAGE_SRC__ = {:?}; window.__STICKY_ANNOTATIONS__ = {:?};",
+        image_src, annotations_json
     );
 
     let _win = WebviewWindowBuilder::new(&app, &label, WebviewUrl::App("index.html".into()))

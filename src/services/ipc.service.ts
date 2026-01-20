@@ -123,12 +123,20 @@ export async function saveTempImage(imageData: Uint8Array): Promise<string> {
 
 export async function createStickyWindow(
   imageSrc: string,
+  annotations: any[], // We pass the raw array, service converts to JSON
   x: number,
   y: number,
   width: number,
   height: number
 ): Promise<void> {
-  await invoke('create_sticky_window', { imageSrc, x, y, width, height });
+  await invoke('create_sticky_window', {
+    imageSrc,
+    annotationsJson: JSON.stringify(annotations),
+    x,
+    y,
+    width,
+    height
+  });
 }
 
 export async function createAIPanelWindow(
