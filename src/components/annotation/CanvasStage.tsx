@@ -405,7 +405,8 @@ export function CanvasStage({
   }, []); // Empty deps - function doesn't depend on any props or state
 
   // Get device pixel ratio for high-DPI displays
-  const pixelRatio = window.devicePixelRatio || 1;
+  // Force at least 2x supersampling to ensure crisp text and image rendering
+  const pixelRatio = Math.max(window.devicePixelRatio || 1, 2);
 
   // Configure canvas context for maximum quality
   useEffect(() => {

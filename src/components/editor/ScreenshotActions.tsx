@@ -139,10 +139,23 @@ export function useScreenshotActions({
     // I will assume I will add `import { useAppStore } from '../../store/appStore';` at the top.
     
     const annotations = useAppStore.getState().annotations;
+    const { monitorOffset } = useAppStore.getState(); // Get monitor offset
+
+    // Convert local logical coordinates to global physical coordinates
+    // This ensures the window opens on the correct monitor at the correct physical position
+    // Use the stored scale factor from monitorOffset if available, otherwise fallback to window
+    const scale = monitorOffset?.scaleFactor || window.devicePixelRatio || 1;
+    
+    // x and y are logical (window-relative). monitorOffset is physical.
+    // We must convert logical -> physical, then add offset.
+    const physicalX = Math.round(x * scale) + (monitorOffset?.x || 0);
+    const physicalY = Math.round(y * scale) + (monitorOffset?.y || 0);
+    const physicalWidth = Math.round(width * scale);
+    const physicalHeight = Math.round(height * scale);
 
     await hideImmediatelyThenPerform(
       async () => {
-        await ipc.createStickyWindow(imageDataURL, annotations, x, y, width, height);
+        await ipc.createStickyWindow(imageDataURL, annotations, physicalX, physicalY, physicalWidth, physicalHeight);
       },
       () => onClose(),
       (error) => console.error('Stick failed', error)

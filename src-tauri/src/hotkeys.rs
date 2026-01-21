@@ -131,45 +131,34 @@ pub fn register_global_hotkey(app: &AppHandle, hotkey: Hotkey) -> Result<(), Str
                         // Using JPEG for speed to minimize the "Jump" delay
                         let app_handle_clone = app_handle.clone();
                         tauri::async_runtime::spawn(async move {
+                            // 4. SAVE TO TEMP FILE
+                            // Using file-based transfer is more robust than large Base64 IPC payloads
+                            let temp_dir = std::env::temp_dir();
+                            let file_path = temp_dir.join("justsnap_capture.jpg"); // Use JPEG for speed/size compromise
+
                             if cfg!(debug_assertions) {
-                                eprintln!("[Hotkey] Starting image encoding...");
+                                eprintln!("[Hotkey] Saving capture to: {:?}", file_path);
                             }
 
-                            let mut buffer = Cursor::new(Vec::new());
-
                             // Convert RGBA to RGB (JPEG doesn't support Alpha)
-                            // This is fast enough to do in background
                             use image::buffer::ConvertBuffer;
                             let rgb_image: image::RgbImage = raw_image.convert();
 
-                            // Use JPEG format with decent quality (80) for speed/quality balance
-                            let mut jpeg_encoder =
-                                image::codecs::jpeg::JpegEncoder::new_with_quality(&mut buffer, 80);
-
-                            if let Err(e) = jpeg_encoder.encode(
-                                &rgb_image, // Pass the converted RGB buffer
-                                rgb_image.width(),
-                                rgb_image.height(),
-                                image::ColorType::Rgb8.into(),
-                            ) {
-                                eprintln!("Failed to encode image: {}", e);
+                            if let Err(e) =
+                                rgb_image.save_with_format(&file_path, image::ImageFormat::Jpeg)
+                            {
+                                eprintln!("[Error] Failed to save temp image: {}", e);
                                 return;
                             }
 
-                            let image_data = buffer.into_inner();
-
-                            // Encode to Base64
-                            let base64_image = BASE64_STANDARD.encode(&image_data);
-
+                            // Emit the FILE PATH
+                            let path_string = file_path.to_string_lossy().to_string();
                             if cfg!(debug_assertions) {
-                                eprintln!(
-                                    "[Hotkey] Image encoded, emitting event (size: {} bytes)",
-                                    base64_image.len()
-                                );
+                                eprintln!("[Hotkey] Emitting path: {}", path_string);
                             }
 
                             if let Err(e) =
-                                app_handle_clone.emit("screen-capture-ready", base64_image)
+                                app_handle_clone.emit("screen-capture-ready", path_string)
                             {
                                 eprintln!("[Error] Failed to emit screen capture event: {}", e);
                             }

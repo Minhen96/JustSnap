@@ -1,6 +1,7 @@
 // JustSnap - Main Application Component
 import { useEffect, useState, lazy, Suspense } from 'react';
 import { useAppStore } from './store/appStore';
+import { convertFileSrc } from '@tauri-apps/api/core';
 import { SnipOverlay } from './components/snipping/SnipOverlay';
 import { ErrorBoundary } from './components/window/ErrorBoundary';
 
@@ -94,12 +95,21 @@ function App() {
         });
 
         await listen('screen-capture-ready', (e: any) => {
-           console.log('[App] Received screen-capture-ready event', typeof e.payload);
+           console.log('[App] Received screen-capture-ready', typeof e.payload);
            try {
              if (typeof e.payload === 'string') {
-               console.log('[App] Received Base64 image, length:', e.payload.length);
-               // Faster path: Base64 string (now JPEG from backend)
-               setImgSrc(`data:image/jpeg;base64,${e.payload}`);
+               console.log('[App] Payload length:', e.payload.length);
+               
+               // Detect if payload is a file path (short) or base64 (long)
+               // File paths are typically < 256 chars, Base64 images are > 1000
+               if (e.payload.length < 500) {
+                   const assetUrl = convertFileSrc(e.payload);
+                   console.log('[App] Loading from asset URL:', assetUrl);
+                   setImgSrc(assetUrl);
+               } else {
+                   // Fallback Base64 string (should not trigger with new backend)
+                   setImgSrc(`data:image/jpeg;base64,${e.payload}`);
+               }
              } else {
                // Legacy path: byte array
                const bytes = new Uint8Array(e.payload);
