@@ -67,6 +67,12 @@ export function CanvasStage({
     };
   }, [imageUrl]);
 
+  // If no image URL provided, just don't load anything (Layer handles null image fine)
+  if (!imageUrl) {
+     // Ensure previous image is cleared if we switch to empty
+     if (image) setImage(null);
+  }
+
   // Focus text input when editing
   useEffect(() => {
     if (editingTextId && textInputRef.current) {

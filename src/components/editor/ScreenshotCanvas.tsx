@@ -25,7 +25,7 @@ export function ScreenshotCanvas({
 
   return (
     <div
-      className="absolute overflow-hidden bg-transparent pointer-events-auto shadow-2xl border border-gray-200"
+      className="absolute overflow-hidden bg-transparent pointer-events-auto shadow-2xl"
       style={{
         left: x,
         top: y,
@@ -34,8 +34,25 @@ export function ScreenshotCanvas({
         borderRadius: '0.5rem',
       }}
     >
+      {/* Background Image - Rendered natively for max quality */}
+      <img 
+        src={screenshot.imageData}
+        alt="Screenshot"
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          objectFit: 'fill',
+          pointerEvents: 'none',
+          // Use pixelated for 1:1 mapping to ensure sharpness (matching Sticky Window)
+          imageRendering: 'pixelated',
+        } as React.CSSProperties}
+      />
+
       <CanvasStage
-        imageUrl={screenshot.imageData}
+        imageUrl="" // Don't pass image to canvas anymore
         annotations={annotations}
         width={width}
         height={height}
