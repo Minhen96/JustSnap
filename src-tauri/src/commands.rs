@@ -54,6 +54,11 @@ pub async fn capture_full_screen(app: tauri::AppHandle) -> Result<String, String
     Ok(general_purpose::STANDARD.encode(&bytes))
 }
 
+#[command]
+pub async fn get_monitors() -> Result<Vec<crate::screen_capture::MonitorInfo>, String> {
+    crate::screen_capture::get_all_monitors()
+}
+
 #[derive(serde::Deserialize)]
 pub struct HotkeyConfig {
     pub key: String,

@@ -46,8 +46,8 @@ function App() {
       try {
         const { listen } = await import('@tauri-apps/api/event');
         
-        await listen('hotkey-triggered', async () => {
-           console.log('[App] Hotkey triggered!');
+        await listen('hotkey-triggered', async (e: any) => {
+           console.log('[App] Hotkey triggered!', e.payload);
 
            const state = useAppStore.getState();
 
@@ -55,7 +55,20 @@ function App() {
            // We do NOT hide the window here because the backend just showed it.
            state.clearScreenshot();
 
-           // STEP 2: Always open fresh overlay
+           // STEP 2: Store monitor offset for coordinate translation
+           if (e.payload && typeof e.payload === 'object') {
+             const { x, y, width, height, scale_factor } = e.payload;
+             state.setMonitorOffset({
+               x: x || 0,
+               y: y || 0,
+               width: width || 1920,
+               height: height || 1080,
+               scaleFactor: scale_factor || 1,
+             });
+             console.log('[App] Monitor offset set:', { x, y, width, height, scale_factor });
+           }
+
+           // STEP 3: Always open fresh overlay
            console.log('[App] Opening fresh overlay...');
 
            // Clear previous image
@@ -81,8 +94,10 @@ function App() {
         });
 
         await listen('screen-capture-ready', (e: any) => {
+           console.log('[App] Received screen-capture-ready event', typeof e.payload);
            try {
              if (typeof e.payload === 'string') {
+               console.log('[App] Received Base64 image, length:', e.payload.length);
                // Faster path: Base64 string (now JPEG from backend)
                setImgSrc(`data:image/jpeg;base64,${e.payload}`);
              } else {

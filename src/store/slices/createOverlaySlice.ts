@@ -1,11 +1,20 @@
 import type { StateCreator } from 'zustand';
 import type { CaptureMode } from '../../types';
 
+export interface MonitorOffset {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    scaleFactor: number;
+}
+
 export interface OverlayState {
     isOverlayActive: boolean;
     currentMode: CaptureMode;
     showToolbar: boolean; // Part of overlay logic? Yes.
     isProcessing: boolean;
+    monitorOffset: MonitorOffset; // Current monitor's position for coordinate translation
 
     // Actions
     showOverlay: (mode?: CaptureMode) => void;
@@ -13,6 +22,7 @@ export interface OverlayState {
     setMode: (mode: CaptureMode) => void;
     toggleToolbar: (show: boolean) => void;
     setProcessing: (isProcessing: boolean) => void;
+    setMonitorOffset: (offset: MonitorOffset) => void;
 }
 
 // We'll use a generic type P (Parent Store) that at least contains OverlayState
@@ -22,6 +32,7 @@ export const createOverlaySlice: StateCreator<OverlayState, [], [], OverlayState
     currentMode: 'capture',
     showToolbar: false,
     isProcessing: false,
+    monitorOffset: { x: 0, y: 0, width: 1920, height: 1080, scaleFactor: 1 },
 
     showOverlay: (mode = 'capture') => {
         // Call resetAIState() from AI slice
@@ -64,4 +75,5 @@ export const createOverlaySlice: StateCreator<OverlayState, [], [], OverlayState
     setMode: (mode) => set({ currentMode: mode }),
     toggleToolbar: (show) => set({ showToolbar: show }),
     setProcessing: (isProcessing) => set({ isProcessing }),
+    setMonitorOffset: (offset) => set({ monitorOffset: offset }),
 });

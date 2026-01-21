@@ -90,6 +90,7 @@ pub fn run() {
             // Screen Capture
             commands::capture_screen,
             commands::capture_full_screen,
+            commands::get_monitors,
             // Hotkeys
             commands::register_hotkey,
             commands::unregister_hotkey,

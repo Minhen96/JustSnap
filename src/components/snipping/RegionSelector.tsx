@@ -31,6 +31,7 @@ export function RegionSelector({ onDragStart }: RegionSelectorProps = {}) {
   const setOCRResult = useAppStore((state) => state.setOCRResult);
   const setOCRError = useAppStore((state) => state.setOCRError);
   const isSmartSelectActive = useAppStore((state) => state.isSmartSelectActive);
+  const monitorOffset = useAppStore((state) => state.monitorOffset);
   // const toggleSmartSelect = useAppStore((state) => state.toggleSmartSelect); // Removed from store
 
   const [isMouseDown, setIsMouseDown] = useState(false);
@@ -387,9 +388,20 @@ export function RegionSelector({ onDragStart }: RegionSelectorProps = {}) {
       
       const scale = window.devicePixelRatio || 1;
       
+      // Add monitor offset to convert window coordinates to virtual desktop coordinates
+      // This is required for multi-monitor support
+      const virtualX = Math.round(region.x * scale) + monitorOffset.x;
+      const virtualY = Math.round(region.y * scale) + monitorOffset.y;
+      
+      if (import.meta.env.DEV) {
+        console.log('[captureRegion] Window coords:', region.x, region.y, 
+          '-> Virtual desktop:', virtualX, virtualY, 
+          '(offset:', monitorOffset.x, monitorOffset.y, ')');
+      }
+      
       const base64Data = await invoke<string>('capture_screen', {
-        x: Math.round(region.x * scale),
-        y: Math.round(region.y * scale),
+        x: virtualX,
+        y: virtualY,
         width: Math.round(region.width * scale),
         height: Math.round(region.height * scale),
       });

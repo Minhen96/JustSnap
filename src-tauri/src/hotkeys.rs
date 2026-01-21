@@ -39,7 +39,24 @@ pub fn register_global_hotkey(app: &AppHandle, hotkey: Hotkey) -> Result<(), Str
     app.global_shortcut()
         .on_shortcut(shortcut, move |_app, _shortcut, event| {
             if event.state == ShortcutState::Pressed {
-                // 1. Hide window to capture clean screen
+                // 1. Get cursor position to determine which monitor to capture
+                #[cfg(windows)]
+                let cursor_pos: Option<(i32, i32)> = {
+                    use windows::Win32::Foundation::POINT;
+                    use windows::Win32::UI::WindowsAndMessaging::GetCursorPos;
+                    unsafe {
+                        let mut point = POINT::default();
+                        if GetCursorPos(&mut point).is_ok() {
+                            Some((point.x, point.y))
+                        } else {
+                            None
+                        }
+                    }
+                };
+                #[cfg(not(windows))]
+                let cursor_pos: Option<(i32, i32)> = None;
+
+                // 2. Hide window to capture clean screen
                 if let Some(window) = app_handle.get_webview_window("main") {
                     let _ = window.hide();
                 }
@@ -47,16 +64,28 @@ pub fn register_global_hotkey(app: &AppHandle, hotkey: Hotkey) -> Result<(), Str
                 // Give the OS a moment to repaint the background
                 std::thread::sleep(std::time::Duration::from_millis(10));
 
-                // Captured raw image (fast)
-                let capture_result = tauri::async_runtime::block_on(async {
-                    crate::screen_capture::capture_full_screen_raw().await
-                });
+                // 3. Capture monitor at cursor position (or primary if cursor detection failed)
+                let capture_result = if let Some((cx, cy)) = cursor_pos {
+                    crate::screen_capture::capture_monitor_at_point_raw(cx, cy)
+                } else {
+                    // Fallback: capture primary monitor
+                    tauri::async_runtime::block_on(async {
+                        crate::screen_capture::capture_full_screen_raw().await
+                    })
+                    .map(|img| (img, 0, 0, 1920, 1080, 1.0)) // Dummy values for primary
+                };
 
                 match capture_result {
-                    Ok(raw_image) => {
-                        // 2. SHOW WINDOW IMMEDIATELY (Optimistic)
-                        if let Some(window) = app_handle.get_webview_window("main") {
+                    Ok((raw_image, mon_x, mon_y, mon_width, mon_height, scale_factor)) => {
+                        if cfg!(debug_assertions) {
+                            eprintln!(
+                                "[Hotkey] Captured monitor at ({},{}) size {}x{} scale {}",
+                                mon_x, mon_y, mon_width, mon_height, scale_factor
+                            );
+                        }
 
+                        // 4. SHOW WINDOW ON THE CAPTURED MONITOR
+                        if let Some(window) = app_handle.get_webview_window("main") {
                             // Basic window setup
                             let _ = window.set_decorations(false);
                             let _ = window.set_always_on_top(true);
@@ -64,19 +93,11 @@ pub fn register_global_hotkey(app: &AppHandle, hotkey: Hotkey) -> Result<(), Str
                             let _ = window.set_shadow(false);
                             let _ = window.set_resizable(true);
 
-                            // Robust reset: Manually set to monitor size
-                            if let Some(monitor) = window.current_monitor().ok().flatten() {
-                                let size = monitor.size();
-                                let scale_factor = monitor.scale_factor();
-                                let logical_width = size.width as f64 / scale_factor;
-                                let logical_height = size.height as f64 / scale_factor;
-
-                                let _ = window.set_position(tauri::LogicalPosition::new(0.0, 0.0));
-                                let _ = window.set_size(tauri::LogicalSize::new(
-                                    logical_width,
-                                    logical_height,
-                                ));
-                            }
+                            // Position window on the detected monitor
+                            // xcap returns physical pixel coordinates, so use PhysicalPosition/Size
+                            let _ = window.set_position(tauri::PhysicalPosition::new(mon_x, mon_y));
+                            let _ =
+                                window.set_size(tauri::PhysicalSize::new(mon_width, mon_height));
 
                             // Ensure window is visible and focused
                             let _ = window.set_fullscreen(true);
@@ -85,14 +106,35 @@ pub fn register_global_hotkey(app: &AppHandle, hotkey: Hotkey) -> Result<(), Str
                             let _ = window.unminimize();
                             let _ = window.set_ignore_cursor_events(false);
 
-                            // Trigger UI to show crosshair/overlay
-                            let _ = app_handle.emit("hotkey-triggered", ());
+                            // Trigger UI to show crosshair/overlay with monitor info for coordinate translation
+                            #[derive(serde::Serialize, Clone)]
+                            struct MonitorOffset {
+                                x: i32,
+                                y: i32,
+                                width: u32,
+                                height: u32,
+                                scale_factor: f64,
+                            }
+                            let _ = app_handle.emit(
+                                "hotkey-triggered",
+                                MonitorOffset {
+                                    x: mon_x,
+                                    y: mon_y,
+                                    width: mon_width,
+                                    height: mon_height,
+                                    scale_factor,
+                                },
+                            );
                         }
 
                         // 3. ENCODE & SEND IMAGE (BACKGROUND)
                         // Using JPEG for speed to minimize the "Jump" delay
                         let app_handle_clone = app_handle.clone();
                         tauri::async_runtime::spawn(async move {
+                            if cfg!(debug_assertions) {
+                                eprintln!("[Hotkey] Starting image encoding...");
+                            }
+
                             let mut buffer = Cursor::new(Vec::new());
 
                             // Convert RGBA to RGB (JPEG doesn't support Alpha)
@@ -118,6 +160,13 @@ pub fn register_global_hotkey(app: &AppHandle, hotkey: Hotkey) -> Result<(), Str
 
                             // Encode to Base64
                             let base64_image = BASE64_STANDARD.encode(&image_data);
+
+                            if cfg!(debug_assertions) {
+                                eprintln!(
+                                    "[Hotkey] Image encoded, emitting event (size: {} bytes)",
+                                    base64_image.len()
+                                );
+                            }
 
                             if let Err(e) =
                                 app_handle_clone.emit("screen-capture-ready", base64_image)

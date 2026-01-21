@@ -5,7 +5,7 @@ import App from './App.tsx'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 
 // CRITICAL DEBUG: Global Error Handler
-window.onerror = function(message, source, lineno, colno, error) {
+window.onerror = function(message, source, lineno, _colno, _error) {
   alert(`Global Error: ${message}\nSource: ${source}:${lineno}`);
   return false;
 };
