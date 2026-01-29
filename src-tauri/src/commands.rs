@@ -248,7 +248,7 @@ pub async fn create_sticky_window(
         .always_on_top(true)
         .skip_taskbar(true);
 
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(any(target_os = "windows", target_os = "macos"))]
     let _win = _win.transparent(true);
 
     let _win = _win
@@ -289,7 +289,7 @@ pub async fn create_ai_panel_window(
         .always_on_top(false) // Allow interaction with other windows
         .skip_taskbar(false); // Process should be visible
 
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(any(target_os = "windows", target_os = "macos"))]
     {
         builder = builder.transparent(true); // Transparent to avoid white box issues
     }
@@ -332,7 +332,7 @@ pub async fn create_translation_window(
         .always_on_top(false)
         .skip_taskbar(false);
 
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(any(target_os = "windows", target_os = "macos"))]
     {
         builder = builder.transparent(true);
     }
