@@ -1,7 +1,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { X, Copy, Save } from 'lucide-react';
-import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
+import { getCurrentWindow, PhysicalSize } from '@tauri-apps/api/window';
 import { invoke } from '@tauri-apps/api/core';
 import { Stage, Layer, Line, Rect, Ellipse, Arrow, Text } from 'react-konva';
 import type { Annotation } from '../../types';
@@ -12,7 +12,7 @@ interface Dimensions {
 }
 
 // Canvas-based image renderer for pixel-perfect display across DPI changes
-function CanvasImage({ imagePath, dimensions }: { imagePath: string, dimensions: Dimensions }) {
+function CanvasImage({ imagePath }: { imagePath: string, dimensions: Dimensions }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
   useEffect(() => {
@@ -41,8 +41,8 @@ function CanvasImage({ imagePath, dimensions }: { imagePath: string, dimensions:
       className="absolute top-0 left-0 select-none pointer-events-none"
       style={{
         // Scale canvas to fit window using CSS (this doesn't affect pixel data)
-        width: `${dimensions.width}px`,
-        height: `${dimensions.height}px`,
+        width: '100%',
+        height: '100%',
         imageRendering: 'pixelated',
       }}
     />
@@ -60,7 +60,16 @@ export function StickyWindow() {
 
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
 
+  // Immediate debug on mount
+  console.log("[StickyWindow] Component mounted, checking window globals");
+  
   useEffect(() => {
+    console.log("[StickyWindow] useEffect running, window:", {
+      type: (window as any).__WINDOW_TYPE__,
+      hasSrc: !!(window as any).__STICKY_IMAGE_SRC__,
+      nativeW: (window as any).__STICKY_NATIVE_WIDTH__,
+      nativeH: (window as any).__STICKY_NATIVE_HEIGHT__,
+    });
     // 1. Get the injected image data URL
     const src = (window as any).__STICKY_IMAGE_SRC__;
     console.log("Sticky Source Found:", !!src);
@@ -72,6 +81,19 @@ export function StickyWindow() {
        img.onload = () => {
            const w = window.innerWidth;
            const h = window.innerHeight;
+           
+           const nativeW = (window as any).__STICKY_NATIVE_WIDTH__;
+           const nativeH = (window as any).__STICKY_NATIVE_HEIGHT__;
+           
+           console.log("[StickyWindow] DEBUG", {
+             imageNaturalWidth: img.width,
+             imageNaturalHeight: img.height,
+             windowInnerWidth: w,
+             windowInnerHeight: h,
+             injectedNativeWidth: nativeW,
+             injectedNativeHeight: nativeH,
+             devicePixelRatio: window.devicePixelRatio
+           });
            
            setInitialDimensions(prev => prev || { width: w, height: h });
 
@@ -103,25 +125,35 @@ export function StickyWindow() {
     }
   }, []);
 
-  // Setup Resize Listener (for manual resizing)
+  // Setup Resize Listener (for manual resizing only, not initial load)
   useEffect(() => {
     let resizeTimeout: ReturnType<typeof setTimeout>;
+    let initialLoadComplete = false;
+    
+    // Wait a bit before enabling resize snapping to avoid initial load issues
+    const initTimer = setTimeout(() => {
+      initialLoadComplete = true;
+    }, 500);
+    
     const handleResize = async () => {
         const width = window.innerWidth;
         const height = window.innerHeight;
 
         setDimensions({ width, height });
 
+        // Skip aspect ratio snapping on initial load
+        if (!initialLoadComplete) return;
+
         const currentRatio = width / height;
 
-        // Debounced aspect ratio snap
+        // Debounced aspect ratio snap (only for manual resizing)
         if (aspectRatio && Math.abs(currentRatio - aspectRatio) > 0.02) {
              clearTimeout(resizeTimeout);
              resizeTimeout = setTimeout(async () => {
-                 const newHeight = Math.round(width / aspectRatio);
+                 const newHeight = width / aspectRatio;
                  const win = getCurrentWindow();
                  try {
-                     await win.setSize(new LogicalSize(width, newHeight));
+                     await win.setSize(new PhysicalSize(width * window.devicePixelRatio, newHeight * window.devicePixelRatio));
                  } catch (e) { console.error(e); }
              }, 100); 
         }
@@ -131,6 +163,7 @@ export function StickyWindow() {
     return () => {
         window.removeEventListener('resize', handleResize);
         clearTimeout(resizeTimeout);
+        clearTimeout(initTimer);
     };
   }, [aspectRatio]);
 
@@ -161,7 +194,56 @@ export function StickyWindow() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [imagePath]); // Add imagePath dependency since actions depend on it
+  }, [imagePath]);
+
+  // Handle DPI Scaling to maintain 1:1 physical pixel size
+  useEffect(() => {
+    let unlisten: () => void;
+    // Use injected Native Dimensions as Source of Truth (if available)
+    // Fallback to DOM measurements if not found (legacy support)
+    let initialPhysicalW = (window as any).__STICKY_NATIVE_WIDTH__ || 0;
+    let initialPhysicalH = (window as any).__STICKY_NATIVE_HEIGHT__ || 0;
+
+    const setupDpiHandler = async () => {
+      // 1. Capture strict physical dimensions on mount (Screen Pixels)
+      // If we have injected native dims, use them for DPI change handling (but NOT for initial resize)
+      if (initialPhysicalW > 0 && initialPhysicalH > 0) {
+           console.log('StickyWindow: Injected Native Dimensions:', initialPhysicalW, initialPhysicalH);
+           // NOTE: We do NOT force initial resize here - Tauri already sets the correct size
+           // The initial resize was causing shrinking on 1x DPI monitors
+
+      } else {
+        // Fallback: Capture from DOM after stabilize
+        setTimeout(async () => {
+            initialPhysicalW = window.innerWidth * window.devicePixelRatio;
+            initialPhysicalH = window.innerHeight * window.devicePixelRatio;
+            console.log('StickyWindow: Captured DOM Physical Dimensions:', initialPhysicalW, initialPhysicalH);
+        }, 500);
+      }
+
+      const { listen } = await import('@tauri-apps/api/event');
+      const { getCurrentWindow, PhysicalSize } = await import('@tauri-apps/api/window');
+      const appWindow = getCurrentWindow();
+
+      // 2. Listen for Scale Factor changes (when moving between monitors)
+      unlisten = await listen('tauri://scale-change', async (event: any) => {
+        const newScaleFactor = event.payload.scaleFactor;
+        console.log('StickyWindow: Scale changed to:', newScaleFactor);
+
+        if (initialPhysicalW > 0 && initialPhysicalH > 0) {
+            // 3. Resize window to maintain physical size
+            console.log('StickyWindow: Resizing to PhysicalSize:', initialPhysicalW, initialPhysicalH);
+            await appWindow.setSize(new PhysicalSize(initialPhysicalW, initialPhysicalH));
+        }
+      });
+    };
+
+    setupDpiHandler();
+
+    return () => {
+      if (unlisten) unlisten();
+    };
+  }, []);
 
   const handleDrag = () => {
      getCurrentWindow().startDragging();

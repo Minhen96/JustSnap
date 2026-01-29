@@ -19,9 +19,7 @@ async function getWorker(): Promise<Worker> {
     console.log('[OCR] Creating new worker...');
   }
 
-  worker = await createWorker('eng', 1, {
-    logger: import.meta.env.DEV ? (m) => console.log('[OCR]', m.status, m.progress) : undefined
-  });
+  worker = await createWorker('eng', 1);
 
   return worker;
 }

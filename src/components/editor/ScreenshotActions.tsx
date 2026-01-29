@@ -25,35 +25,88 @@ export function useScreenshotActions({
   onFeedback,
   onClose,
 }: ScreenshotActionsProps) {
-  const exportCanvasAsDataURL = (useMaxQuality: boolean = false): string => {
+  const exportCanvasAsDataURL = async (): Promise<string> => {
+    // 1. Find the Background Canvas (The Screenshot itself)
+    const bgCanvas = document.querySelector('.background-canvas') as HTMLCanvasElement;
+    
+    // 2. Get the Konva Stage (Annotations)
     const stage = window.__konvaStage;
+
+    console.log('[exportCanvasAsDataURL] DEBUG', {
+      bgCanvasFound: !!bgCanvas,
+      bgCanvasWidth: bgCanvas?.width,
+      bgCanvasHeight: bgCanvas?.height,
+      stageFound: !!stage,
+      stageWidth: stage?.width(),
+      stageHeight: stage?.height(),
+      screenshotDataLength: screenshot.imageData?.length
+    });
+
+    if (!bgCanvas || bgCanvas.width === 0) {
+      console.warn('Background canvas not found or empty, returning raw image data');
+      return screenshot.imageData || '';
+    }
+
+    // 3. Create a Composite Canvas matching background resolution (physical pixels)
+    const compositeCanvas = document.createElement('canvas');
+    compositeCanvas.width = bgCanvas.width;
+    compositeCanvas.height = bgCanvas.height;
+    
+    const ctx = compositeCanvas.getContext('2d');
+    if (!ctx) return screenshot.imageData || '';
+    
+    // 4. Draw Background (pixel-perfect, no smoothing)
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(bgCanvas, 0, 0);
+
+    // 5. Draw Annotations (if any, scaled to match physical resolution)
     if (stage) {
-      const devicePixelRatio = window.devicePixelRatio || 1;
-
-      // For sticky windows without annotations, we use original
-      // For copy/save/with annotations, use appropriate quality
-      let pixelRatio: number;
-      if (useMaxQuality) {
-        // Maximum quality for save/copy operations
-        const supersamplingRatio = 4;
-        pixelRatio = Math.max(devicePixelRatio * 2, supersamplingRatio);
-      } else {
-        // For sticky with annotations, use 2x to balance quality and file size
-        // This prevents the "too much compression" issue from 4x exports
-        pixelRatio = Math.max(devicePixelRatio, 2);
-      }
-
-      return stage.toDataURL({
-        pixelRatio,
+      // Calculate scale to match annotation layer to background resolution exactly
+      const scaleX = bgCanvas.width / stage.width();
+      const scaleY = bgCanvas.height / stage.height();
+      // Use scaleX since aspect ratio should be maintained
+      const scale = scaleX; 
+      
+      console.log('[exportCanvasAsDataURL] Annotation scale:', { 
+        scaleX, scaleY, scale,
+        expectedWidth: stage.width() * scale,
+        expectedHeight: stage.height() * scale
+      });
+      
+      const annotationDataURL = stage.toDataURL({
+        pixelRatio: scale, 
         mimeType: 'image/png',
         quality: 1.0
       });
+
+      // Load and draw annotations
+      const annotationImg = new Image();
+      await new Promise<void>((resolve) => {
+        annotationImg.onload = () => {
+          console.log('[exportCanvasAsDataURL] Annotation image loaded:', 
+            annotationImg.width, 'x', annotationImg.height,
+            'composite:', compositeCanvas.width, 'x', compositeCanvas.height
+          );
+          resolve();
+        };
+        annotationImg.onerror = () => {
+          console.error('[exportCanvasAsDataURL] Failed to load annotation image');
+          resolve();
+        };
+        annotationImg.src = annotationDataURL;
+      });
+      
+      // Draw annotation at natural size (should match composite if scale is correct)
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(annotationImg, 0, 0);
     }
-    return screenshot.imageData || '';
+
+    console.log('[exportCanvasAsDataURL] Final composite:', compositeCanvas.width, 'x', compositeCanvas.height);
+    return compositeCanvas.toDataURL('image/png');
   };
 
   const handleCopy = async () => {
-    const dataURL = exportCanvasAsDataURL(true); // Use max quality for copy
+    const dataURL = await exportCanvasAsDataURL();
     
     // We perform the copy operation BEFORE hiding the window
     // This is critical because navigator.clipboard requires the window to be focused
@@ -97,7 +150,7 @@ export function useScreenshotActions({
   };
 
   const handleSave = async () => {
-    const dataURL = exportCanvasAsDataURL(true); // Use max quality for save
+    const dataURL = await exportCanvasAsDataURL();
 
     // Convert to bytes immediately (before hiding)
     const response = await fetch(dataURL);
@@ -153,26 +206,37 @@ export function useScreenshotActions({
     // I will assume I will add `import { useAppStore } from '../../store/appStore';` at the top.
     
     const annotations = useAppStore.getState().annotations;
-    const { monitorOffset } = useAppStore.getState(); // Get monitor offset
+    const { monitorOffset } = useAppStore.getState();
 
-    // Convert local logical coordinates to global physical coordinates
-    // This ensures the window opens on the correct monitor at the correct physical position
-    // Use the stored scale factor from monitorOffset if available, otherwise fallback to window
-    const scale = monitorOffset?.scaleFactor || window.devicePixelRatio || 1;
+    // The screenshot region x,y are already in screen coordinates (from the overlay)
+    // We add the monitor offset to get global screen position
+    const screenX = x + (monitorOffset?.x || 0);
+    const screenY = y + (monitorOffset?.y || 0);
     
-    // x and y are logical (window-relative). monitorOffset is physical.
-    // We must convert logical -> physical, then add offset.
-    const physicalX = Math.round(x * scale) + (monitorOffset?.x || 0);
-    const physicalY = Math.round(y * scale) + (monitorOffset?.y || 0);
-    const physicalWidth = Math.round(width * scale);
-    const physicalHeight = Math.round(height * scale);
+    // Get image physical dimensions for native sizing
+    const scale = monitorOffset?.scaleFactor || window.devicePixelRatio || 1;
+    const nativeWidth = Math.round(width * scale);
+    const nativeHeight = Math.round(height * scale);
+
+    console.log('[handleStick] DEBUG', {
+      regionX: x, regionY: y,
+      screenX, screenY,
+      logicalWidth: width, logicalHeight: height,
+      scale,
+      nativeWidth, nativeHeight,
+      monitorOffset: monitorOffset
+    });
 
     await hideImmediatelyThenPerform(
       async () => {
-        await ipc.createStickyWindow(imageDataURL, annotations, physicalX, physicalY, physicalWidth, physicalHeight);
+        // Position uses screen coordinates, size uses logical dimensions
+        await ipc.createStickyWindow(imageDataURL, annotations, screenX, screenY, width, height, nativeWidth, nativeHeight);
       },
       () => onClose(),
-      (error) => console.error('Stick failed', error)
+      (error) => {
+        console.error('Stick failed', error);
+        onFeedback(`Pin failed: ${error}`);
+      }
     );
   };
 
@@ -192,7 +256,7 @@ export function useScreenshotActions({
     const x = Math.max(margin, logicalWidth - panelWidth - margin);
     const y = 60; // Top margin
 
-    const dataURL = exportCanvasAsDataURL();
+    const dataURL = await exportCanvasAsDataURL();
 
     if (dataURL) {
       await ipc.createAIPanelWindow(dataURL, framework, x, y, panelWidth, panelHeight);

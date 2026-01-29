@@ -127,15 +127,20 @@ export async function createStickyWindow(
   x: number,
   y: number,
   width: number,
-  height: number
+  height: number,
+  nativeWidth: number,
+  nativeHeight: number
 ): Promise<void> {
+  console.log('[IPC] createStickyWindow called', { x, y, width, height, nativeWidth, nativeHeight });
   await invoke('create_sticky_window', {
     imageSrc,
-    annotationsJson: JSON.stringify(annotations),
+    annotationsJson: JSON.stringify(annotations || []),
     x,
     y,
     width,
-    height
+    height,
+    nativeWidth,
+    nativeHeight
   });
 }
 

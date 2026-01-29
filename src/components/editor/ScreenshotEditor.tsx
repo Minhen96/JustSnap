@@ -55,20 +55,16 @@ export function ScreenshotEditor() {
     });
   }, [currentScreenshot]);
 
-  // Window Snapping Logic (Fix for mixed-DPI blur)
-  useEffect(() => {
-    if (currentScreenshot) {
-      import('../../utils/windowManager').then(({ snapWindowToScreenshot, restoreOverlayFullscreen }) => {
-        // Snap to monitor where screenshot was taken
-        snapWindowToScreenshot(currentScreenshot.region);
-        
-        // Restore fullscreen on cleanup
-        return () => {
-          restoreOverlayFullscreen();
-        };
-      });
-    }
-  }, []); // Run once on mount
+  // Window Snapping Logic - TEMPORARILY DISABLED
+  // TODO: Coordinate system mismatch between capture region and monitor detection
+  // useEffect(() => {
+  //   if (!currentScreenshot) return;
+  //   
+  //   import('../../utils/windowManager').then(({ snapWindowToScreenshot }) => {
+  //     // Snap to monitor where screenshot was taken
+  //     snapWindowToScreenshot(currentScreenshot.region);
+  //   });
+  // }, [currentScreenshot]);
 
   // Reset cursor to default when editor mounts
   useEffect(() => {

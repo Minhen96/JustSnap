@@ -22,6 +22,13 @@
     "core:window:allow-minimize",
     "core:window:allow-set-ignore-cursor-events",
     "core:window:allow-start-dragging",
-    "core:window:allow-start-resize-dragging"
+    "core:window:allow-start-resize-dragging",
+    "core:window:allow-set-decorations",
+    "core:window:allow-set-size",
+    "core:window:allow-set-position",
+    "core:window:allow-close",
+    "core:window:allow-current-monitor",
+    "core:window:allow-available-monitors",
+    "dialog:default"
   ]
 }

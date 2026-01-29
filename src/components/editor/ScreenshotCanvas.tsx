@@ -41,7 +41,7 @@ function CanvasImage({ imagePath, dimensions }: { imagePath: string, dimensions:
   return (
     <canvas 
       ref={canvasRef}
-      className="absolute top-0 left-0 select-none pointer-events-none"
+      className="background-canvas absolute top-0 left-0 select-none pointer-events-none"
       style={{
         // Scale canvas to fit window using CSS (this doesn't affect pixel data)
         width: `${dimensions.width}px`,

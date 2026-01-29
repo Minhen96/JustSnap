@@ -224,15 +224,21 @@ pub async fn create_sticky_window(
     y: f64,
     width: f64,
     height: f64,
+    native_width: f64,  // New: Physical Width of the original image
+    native_height: f64, // New: Physical Height of the original image
 ) -> Result<(), String> {
     use tauri::{WebviewUrl, WebviewWindowBuilder};
 
     let label = format!("sticky_{}", chrono::Utc::now().timestamp_micros());
 
-    // Inject window type and image src
+    // Inject window type and image src, AND native dimensions
     let init_script = format!(
-        "window.__WINDOW_TYPE__ = 'sticky'; window.__STICKY_IMAGE_SRC__ = {:?}; window.__STICKY_ANNOTATIONS__ = {:?};",
-        image_src, annotations_json
+        "window.__WINDOW_TYPE__ = 'sticky'; 
+         window.__STICKY_IMAGE_SRC__ = {:?}; 
+         window.__STICKY_ANNOTATIONS__ = {:?};
+         window.__STICKY_NATIVE_WIDTH__ = {};
+         window.__STICKY_NATIVE_HEIGHT__ = {};",
+        image_src, annotations_json, native_width, native_height
     );
 
     let _win = WebviewWindowBuilder::new(&app, &label, WebviewUrl::App("index.html".into()))

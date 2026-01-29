@@ -132,18 +132,15 @@ pub fn register_global_hotkey(app: &AppHandle, hotkey: Hotkey) -> Result<(), Str
                             // 4. SAVE TO TEMP FILE
                             // Using file-based transfer is more robust than large Base64 IPC payloads
                             let temp_dir = std::env::temp_dir();
-                            let file_path = temp_dir.join("justsnap_capture.jpg"); // Use JPEG for speed/size compromise
+                            let file_path = temp_dir.join("justsnap_capture.png"); // Use PNG for lossless quality
 
                             if cfg!(debug_assertions) {
                                 eprintln!("[Hotkey] Saving capture to: {:?}", file_path);
                             }
 
-                            // Convert RGBA to RGB (JPEG doesn't support Alpha)
-                            use image::buffer::ConvertBuffer;
-                            let rgb_image: image::RgbImage = raw_image.convert();
-
+                            // Save as PNG directly (supports RGBA)
                             if let Err(e) =
-                                rgb_image.save_with_format(&file_path, image::ImageFormat::Jpeg)
+                                raw_image.save_with_format(&file_path, image::ImageFormat::Png)
                             {
                                 eprintln!("[Error] Failed to save temp image: {}", e);
                                 return;

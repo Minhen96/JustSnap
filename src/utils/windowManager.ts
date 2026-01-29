@@ -108,32 +108,66 @@ export async function snapWindowToScreenshot(region: { x: number, y: number, wid
   const centerX = region.x + region.width / 2;
   const centerY = region.y + region.height / 2;
 
-  const targetMonitor = monitors.find(m => {
-    const { x, y } = m.position;
-    const { width, height } = m.size;
+  console.log('[windowManager] Screenshot region:', region);
+  console.log('[windowManager] Screenshot center (logical):', centerX, centerY);
+  console.log('[windowManager] Available monitors:', monitors.map(m => ({
+    name: m.name,
+    pos: m.position,
+    size: m.size,
+    scale: m.scaleFactor
+  })));
 
-    // Note: m.position is physical
-    // region is logical
-    // This comparison is fuzzy but "good enough" for identifying the monitor
-    // A better way is to convert logic to physical but we need scale factor.
-    // Or we use cursor position.
+  // Determine target monitor by finding the one with the closest center point in Logical Space
+  // We convert Monitor Physical coordinates to Logical to match the Screenshot Region
+  const bestMonitor = monitors.sort((a, b) => {
+    const scaleA = a.scaleFactor || 1;
+    const scaleB = b.scaleFactor || 1;
 
-    // Let's assume region coords are roughly correct for monitor finding.
-    return centerX >= x && centerX < x + width &&
-      centerY >= y && centerY < y + height;
-  }) || monitors[0]; // Fallback to primary
+    // Monitor A Center (Logical)
+    // Note: This assumes Monitor Position (Physical) starts at (0,0) of that specific monitor in Logical space?
+    // No, on Windows, Logical coordinates are global.
+    // However, Tauri returns Position in Physical pixels relative to global Virtual Screen top-left (usually).
+    // So dividing by scaleFactor is generally the correct way to get the global Logical coordinate.
+    const aX = a.position.x / scaleA;
+    const aY = a.position.y / scaleA;
+    const aW = a.size.width / scaleA;
+    const aH = a.size.height / scaleA;
+    const aCx = aX + aW / 2;
+    const aCy = aY + aH / 2;
 
-  if (targetMonitor) {
+    // Monitor B Center (Logical)
+    const bX = b.position.x / scaleB;
+    const bY = b.position.y / scaleB;
+    const bW = b.size.width / scaleB;
+    const bH = b.size.height / scaleB;
+    const bCx = bX + bW / 2;
+    const bCy = bY + bH / 2;
+
+    // Distance from Screenshot Center (Logical)
+    const distA = Math.hypot(centerX - aCx, centerY - aCy);
+    const distB = Math.hypot(centerX - bCx, centerY - bCy);
+
+    console.log('[windowManager] Monitor', a.name, 'center:', aCx, aCy, 'dist:', distA);
+    console.log('[windowManager] Monitor', b.name, 'center:', bCx, bCy, 'dist:', distB);
+
+    return distA - distB;
+  })[0] || monitors[0];
+
+  if (bestMonitor) {
+    console.log('[windowManager] Selected monitor:', bestMonitor.name, 'at', bestMonitor.position, 'scale:', bestMonitor.scaleFactor);
+
     // We must exit fullscreen first to move/resize
     await win.setFullscreen(false);
     await win.setDecorations(false);
 
-    // Move to target monitor
-    const monitorX = targetMonitor.position.x;
-    const monitorY = targetMonitor.position.y;
+    // Calculate Logical Position for target monitor
+    // We use the monitor's physical position converted to logical
+    const scale = bestMonitor.scaleFactor || 1;
+    const logicalX = bestMonitor.position.x / scale;
+    const logicalY = bestMonitor.position.y / scale;
 
-    // Move window to top-left of target monitor
-    await win.setPosition(new LogicalPosition(monitorX, monitorY));
+    // Move window to top-left of target monitor (Logical)
+    await win.setPosition(new LogicalPosition(logicalX, logicalY));
 
     // Re-enable fullscreen (should snap to *that* monitor)
     await win.setFullscreen(true);

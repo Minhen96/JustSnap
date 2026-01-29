@@ -46,7 +46,8 @@ export function WelcomeScreen() {
 
            {/* Description */}
            <p className="text-lg text-gray-400 max-w-md font-light leading-relaxed">
-             The fastest way to <span className="text-blue-400 font-medium">capture</span>, <span className="text-purple-400 font-medium">annotate</span>, and <span className="text-pink-400 font-medium">share</span> your screen.
+             {/* The fastest way to <span className="text-blue-400 font-medium">capture</span>, <span className="text-purple-400 font-medium">annotate</span>, and <span className="text-pink-400 font-medium">share</span> your screen. */}
+             The fastest way to capture, annotate, and share your screen.
            </p>
         </div>
 
