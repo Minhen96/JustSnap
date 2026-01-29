@@ -414,6 +414,7 @@ unsafe extern "system" fn enum_windows_proc(
 }
 
 #[cfg(not(windows))]
+#[allow(dead_code)]
 fn get_window_z_order_map() -> std::collections::HashMap<u32, i32> {
     // On non-Windows platforms, return empty map
     // The z_order will default to the xcap enumeration order
