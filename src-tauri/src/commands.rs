@@ -282,6 +282,7 @@ pub async fn create_ai_panel_window(
         image_src, framework
     );
 
+    #[allow(unused_mut)]
     let mut builder = WebviewWindowBuilder::new(&app, &label, WebviewUrl::App("index.html".into()))
         .title("JustSnap AI Code")
         .decorations(false) // Frameless for custom UI
@@ -325,6 +326,7 @@ pub async fn create_translation_window(
     let width = 400.0;
     let height = 600.0;
 
+    #[allow(unused_mut)]
     let mut builder = WebviewWindowBuilder::new(&app, &label, WebviewUrl::App("index.html".into()))
         .title("JustSnap Translate")
         .decorations(false) // Frameless

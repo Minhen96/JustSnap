@@ -65,6 +65,7 @@
 - Node.js (v18+)
 - Rust (latest stable)
 - [Tauri Prerequisites](https://tauri.app/v1/guides/getting-started/prerequisites) (Build Tools for C++ on Windows)
+- **Linux Requirements**: `libpipewire-0.3-dev`, `libclang-dev`, `libxcb1-dev`, `libxrandr-dev`, `libdbus-1-dev`, `libwayland-dev` (required for screen capture support)
 
 ### Development
 1. **Clone & Install**
