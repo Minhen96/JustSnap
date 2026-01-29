@@ -2,17 +2,36 @@
 
 **JustSnap** is an AI-powered desktop snipping tool built with Tauri, React, and Rust. It combines traditional screen capture with modern AI capabilities and a seamless, high-performance experience.
 
+<div align="center">
+  <img src="https://github.com/user-attachments/assets/01d47519-64da-4ad4-8099-72be3e08f724" alt="Welcome Screen" width="800" />
+</div>
+
 ## ✨ Features
 
 ### 📸 Core Capture
-- **Global Hotkey**: `Ctrl+Shift+S` to snap instantly.
+**Global Hotkey**: `Ctrl+Shift+S` (Customizable) to snap instantly.
+
+<div align="center">
+  <img src="https://github.com/user-attachments/assets/3363536b-8bb7-42b7-8481-ac6563c60267" alt="Snipping Overlay" width="600" />
+</div>
+
 - **Region Selection**: Drag to select, with live dimensions.
 - **High-DPI Support**: Crystal clear captures on any monitor.
 - **Sticky Windows**: "Pin" captures to your screen as always-on-top references.
 - **Clipboard Integration**: Copy as image, or save directly to disk.
+- **System Tray**: Quick access to history and settings.
+
+<div align="center">
+  <img src="https://github.com/user-attachments/assets/a981b3b7-cf88-4a0e-907b-5ecf7bf6bf17" alt="System Tray" width="400" />
+</div>
 
 ### 🎨 Annotation & Editing
-- **Professional Tools**: Pen, Highlighter, Arrow, Rectangle, Circle, and Text.
+**Professional Tools**: Pen, Highlighter, Arrow, Rectangle, Circle, and Text.
+
+<div align="center">
+  <img src="https://github.com/user-attachments/assets/e4e4213c-a542-49ec-b6a4-775f65b94bb9" alt="Toolbar" width="800" />
+</div>
+
 - **Blur Tool**: Securely redact sensitive info.
 - **Customizable**: Adjustable stroke widths, colors, and opacity.
 - **History**: Full Undo/Redo support.
@@ -23,7 +42,12 @@
 - **OCR & Translation**: Extract text and translate instantly.
 
 ### ⚙️ Customization
-- **Toolbar Config**: Enable/Disable specific tools.
+**Toolbar Config**: Enable/Disable specific tools, customize shortcuts, and more.
+
+<div align="center">
+  <img src="https://github.com/user-attachments/assets/a73844a0-6306-4afb-b6a1-0abed5a393cb" alt="Settings Page" width="800" />
+</div>
+
 - **Behavior Settings**: Auto-close after copy/save, customizable hotkeys.
 - **Theme**: Dark/Light mode support.
 

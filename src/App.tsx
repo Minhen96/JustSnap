@@ -207,6 +207,7 @@ function App() {
     }}>
       
       {/* LAYER 1: Background Image (Fake Transparency) */}
+      {/* LAYER 1: Background Image (Fake Transparency) */}
       {imgSrc && (
         <img 
           src={imgSrc} 
@@ -218,9 +219,15 @@ function App() {
             height: '100%',
             objectFit: 'cover',
             zIndex: 0, 
-            pointerEvents: 'none'
+            pointerEvents: 'none',
+            // If image fails to load (broken link), make it transparent so we don't see the broken icon
+            opacity: imgSrc ? 1 : 0 
           }}
-          alt="Background"
+          alt="" // Empty alt to avoid "Background" text if image breaks
+          onError={(e) => {
+            console.error('[App] Background image failed to load:', imgSrc);
+            e.currentTarget.style.display = 'none'; // Hide immediately on error
+          }}
         />
       )}
 

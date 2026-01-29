@@ -159,9 +159,11 @@ export function RegionSelector({ onDragStart }: RegionSelectorProps = {}) {
         try {
           const scale = window.devicePixelRatio || 1;
 
-          // Convert screen coordinates to physical pixels
-          const physicalX = Math.round(clientX * scale);
-          const physicalY = Math.round(clientY * scale);
+          // Convert screen coordinates to physical pixels + add monitor offset for global position
+          const offsetX = monitorOffset?.x || 0;
+          const offsetY = monitorOffset?.y || 0;
+          const physicalX = Math.round(clientX * scale) + offsetX;
+          const physicalY = Math.round(clientY * scale) + offsetY;
 
           // Temporarily make overlay click-through
           await tauriWindow.setIgnoreCursorEvents(true);
@@ -179,10 +181,11 @@ export function RegionSelector({ onDragStart }: RegionSelectorProps = {}) {
 
           if (windowAtPoint) {
             // Scale coordinates back to CSS pixels for display
+            // AND subtract monitor offset to get overlay-relative coordinates
             const scaledWindow = {
               ...windowAtPoint,
-              x: windowAtPoint.x / scale,
-              y: windowAtPoint.y / scale,
+              x: (windowAtPoint.x - offsetX) / scale,
+              y: (windowAtPoint.y - offsetY) / scale,
               width: windowAtPoint.width / scale,
               height: windowAtPoint.height / scale,
             };
@@ -295,10 +298,13 @@ export function RegionSelector({ onDragStart }: RegionSelectorProps = {}) {
         // Update state immediately for responsiveness
         setCurrentRegion(region);
         
-        // SPECIAL CASE: Full Screen
+        // SPECIAL CASE: Full Screen - Use captureRegion with full window dimensions
+        // This ensures proper multi-monitor support via monitorOffset
         if (isFullScreen) {
           console.log('[RegionSelector] Triggering Full Screen Capture (Edge/Smart)');
-          await captureFullScreen();
+          // Use full window region instead of captureFullScreen to include monitor offset
+          const fullScreenRegion = { x: 0, y: 0, width: w, height: h };
+          await captureRegion(fullScreenRegion);
         } else {
           await captureRegion(region);
         }
@@ -308,61 +314,7 @@ export function RegionSelector({ onDragStart }: RegionSelectorProps = {}) {
     }
   };
 
-  const captureFullScreen = async () => {
-    try {
-       setProcessing(true);
-       
-       const { invoke } = await import('@tauri-apps/api/core');
-       
-       // Hide border before capturing: Wait for React render + Paint
-       await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 30)));
 
-       const base64Data = await invoke<string>('capture_full_screen');
-       
-       const res = await fetch(`data:image/bmp;base64,${base64Data}`);
-       const blob = await res.blob();
-       const imageUrl = URL.createObjectURL(blob);
-       
-       // Align full screen region to pixels as well
-       const pixelRatio = window.devicePixelRatio || 1;
-       const region = { 
-          x: 0, 
-          y: 0, 
-          width: Math.round(window.innerWidth * pixelRatio) / pixelRatio, 
-          height: Math.round(window.innerHeight * pixelRatio) / pixelRatio 
-       };
-
-       const screenshot = {
-        id: crypto.randomUUID(),
-        imageData: imageUrl,
-        region,
-        timestamp: Date.now(),
-        mode: 'capture' as const,
-      };
-      setScreenshot(screenshot);
-
-      // OCR logic
-      console.log('[RegionSelector] Starting OCR...');
-      setOCRLoading(true);
-      setOCRProgress(0);
-
-      extractText(imageUrl, (progress) => {
-        setOCRProgress(progress);
-      })
-        .then((result) => {
-          setOCRResult(result);
-        })
-        .catch((error) => {
-          setOCRError(error instanceof Error ? error.message : 'OCR failed');
-        });
-
-    } catch (error) {
-      console.error('Failed to capture full screen:', error);
-      alert('Failed to capture screen.');
-    } finally {
-      setProcessing(false);
-    }
-  };
 
   // Capture function
   const captureRegion = async (inputRegion: Region) => {
