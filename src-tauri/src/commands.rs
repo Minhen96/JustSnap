@@ -246,14 +246,18 @@ pub async fn create_sticky_window(
         .decorations(false)
         .resizable(true)
         .always_on_top(true)
-        .skip_taskbar(true)
-        .transparent(true)
+        .skip_taskbar(true);
+
+    #[cfg(not(target_os = "linux"))]
+    let _win = _win.transparent(true);
+
+    let _win = _win
         .shadow(true)
         .inner_size(width, height)
         .position(x, y)
         .initialization_script(&init_script)
         .build()
-        .map_err(|e| e.to_string())?;
+        .map_err(|e: tauri::Error| e.to_string())?;
 
     Ok(())
 }
@@ -278,19 +282,25 @@ pub async fn create_ai_panel_window(
         image_src, framework
     );
 
-    let _ = WebviewWindowBuilder::new(&app, &label, WebviewUrl::App("index.html".into()))
+    let mut builder = WebviewWindowBuilder::new(&app, &label, WebviewUrl::App("index.html".into()))
         .title("JustSnap AI Code")
         .decorations(false) // Frameless for custom UI
         .resizable(true) // Start resizable for dragging
         .always_on_top(false) // Allow interaction with other windows
-        .skip_taskbar(false) // Process should be visible
-        .transparent(true) // Transparent to avoid white box issues
+        .skip_taskbar(false); // Process should be visible
+
+    #[cfg(not(target_os = "linux"))]
+    {
+        builder = builder.transparent(true); // Transparent to avoid white box issues
+    }
+
+    let _ = builder
         .shadow(true)
         .inner_size(width, height)
         .position(x, y)
         .initialization_script(&init_script)
         .build()
-        .map_err(|e| e.to_string())?;
+        .map_err(|e: tauri::Error| e.to_string())?;
 
     Ok(())
 }
@@ -315,19 +325,25 @@ pub async fn create_translation_window(
     let width = 400.0;
     let height = 600.0;
 
-    let _ = WebviewWindowBuilder::new(&app, &label, WebviewUrl::App("index.html".into()))
+    let mut builder = WebviewWindowBuilder::new(&app, &label, WebviewUrl::App("index.html".into()))
         .title("JustSnap Translate")
         .decorations(false) // Frameless
         .resizable(true)
         .always_on_top(false)
-        .skip_taskbar(false)
-        .transparent(true)
+        .skip_taskbar(false);
+
+    #[cfg(not(target_os = "linux"))]
+    {
+        builder = builder.transparent(true);
+    }
+
+    let _ = builder
         .shadow(true)
         .inner_size(width, height)
         .position(x, y)
         .initialization_script(&init_script)
         .build()
-        .map_err(|e| e.to_string())?;
+        .map_err(|e: tauri::Error| e.to_string())?;
 
     Ok(())
 }
