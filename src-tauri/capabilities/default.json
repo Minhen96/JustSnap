@@ -4,6 +4,7 @@
   "description": "enables the default permissions",
   "windows": [
     "main",
+    "welcome",
     "sticky*",
     "ai_panel*",
     "translation*"

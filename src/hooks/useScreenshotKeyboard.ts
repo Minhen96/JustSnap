@@ -11,6 +11,7 @@ interface UseScreenshotKeyboardProps {
   onClose: () => void;
   onCopy?: () => void;
   onSave?: () => void;
+  onStick?: () => void;
   enabled?: boolean;
 }
 
@@ -29,6 +30,7 @@ interface UseScreenshotKeyboardProps {
  * - A: Arrow tool
  * - T: Text tool
  * - B: Blur tool
+ * - Enter: Pin screenshot
  * - Escape: Close editor
  */
 export function useScreenshotKeyboard({
@@ -38,6 +40,7 @@ export function useScreenshotKeyboard({
   onClose,
   onCopy,
   onSave,
+  onStick,
   enabled = true,
 }: UseScreenshotKeyboardProps) {
   useEffect(() => {
@@ -99,6 +102,9 @@ export function useScreenshotKeyboard({
           case 'b':
             onSetTool('blur');
             break;
+          case 'enter':
+            onStick?.();
+            break;
           case 'escape':
             onClose();
             break;
@@ -108,5 +114,5 @@ export function useScreenshotKeyboard({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [enabled, onUndo, onRedo, onSetTool, onClose, onCopy, onSave]);
+  }, [enabled, onUndo, onRedo, onSetTool, onClose, onCopy, onSave, onStick]);
 }

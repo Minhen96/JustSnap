@@ -52,6 +52,61 @@ function App() {
 
            const state = useAppStore.getState();
 
+           // STEP 0: Rehydrate store from localStorage (sync settings from other windows)
+           try {
+             const stored = localStorage.getItem('app-storage');
+             if (stored) {
+               const parsed = JSON.parse(stored);
+               if (parsed.state?.toolbarConfig) {
+                 useAppStore.setState({ toolbarConfig: parsed.state.toolbarConfig });
+                 console.log('[App] Rehydrated toolbarConfig from localStorage');
+               }
+               if (parsed.state?.defaultTool) {
+                 useAppStore.setState({ currentTool: parsed.state.defaultTool });
+                 console.log('[App] Set default tool:', parsed.state.defaultTool);
+               }
+               if (parsed.state?.colorPalette) {
+                 useAppStore.setState({ colorPalette: parsed.state.colorPalette });
+                 console.log('[App] Rehydrated colorPalette from localStorage');
+               }
+               if (typeof parsed.state?.autoCloseAfterCopy === 'boolean') {
+                 useAppStore.setState({ autoCloseAfterCopy: parsed.state.autoCloseAfterCopy });
+               }
+               if (typeof parsed.state?.autoCloseAfterSave === 'boolean') {
+                 useAppStore.setState({ autoCloseAfterSave: parsed.state.autoCloseAfterSave });
+               }
+               
+               // Re-register hotkeys if they exist in storage
+               if (parsed.state?.hotkeys?.capture) {
+                 const savedHotkey = parsed.state.hotkeys.capture;
+                 useAppStore.setState(state => ({ 
+                    hotkeys: { ...state.hotkeys, capture: savedHotkey } 
+                 }));
+                 console.log('[App] Rehydrating hotkey:', savedHotkey);
+                 
+                 // Unregister default and register saved
+                 try {
+                    const { invoke } = await import('@tauri-apps/api/core');
+                    const parts = savedHotkey.split('+');
+                    const key = parts.pop();
+                    const modifiers = parts;
+                    
+                    if (key) {
+                        // First unregister default/all
+                        // We use a safe-guard command if available, or just register the new one.
+                        // Ideally we should unregister the old one first.
+                        await invoke('register_hotkey', { modifiers, key });
+                        console.log('[App] Re-registered custom hotkey:', savedHotkey);
+                    }
+                 } catch (hkErr) {
+                    console.error('[App] Failed to register saved hotkey:', hkErr);
+                 }
+               }
+             }
+           } catch (err) {
+             console.warn('[App] Failed to rehydrate settings:', err);
+           }
+
            // STEP 1: Reset state (clear any active screenshot/annotations)
            // We do NOT hide the window here because the backend just showed it.
            state.clearScreenshot();

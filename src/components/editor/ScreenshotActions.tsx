@@ -54,38 +54,46 @@ export function useScreenshotActions({
 
   const handleCopy = async () => {
     const dataURL = exportCanvasAsDataURL(true); // Use max quality for copy
+    
+    // We perform the copy operation BEFORE hiding the window
+    // This is critical because navigator.clipboard requires the window to be focused
+    try {
+      const response = await fetch(dataURL);
+      const blob = await response.blob();
+      let success = false;
 
-    await hideImmediatelyThenPerform(
-      async () => {
-        const response = await fetch(dataURL);
-        const blob = await response.blob();
-
-        // Try frontend clipboard first
-        let success = false;
-        if (navigator.clipboard && window.ClipboardItem) {
-          try {
-            await navigator.clipboard.write([
-              new ClipboardItem({ 'image/png': blob })
-            ]);
-            success = true;
-          } catch (err) {
-            console.warn('Frontend clipboard failed, trying backend:', err);
-          }
+      // 1. Try Frontend Clipboard (Preferred, supports more formats/metadata if needed)
+      if (navigator.clipboard && window.ClipboardItem) {
+        try {
+          await navigator.clipboard.write([
+            new ClipboardItem({ 'image/png': blob })
+          ]);
+          success = true;
+          console.log('[ScreenshotActions] Frontend copy success');
+        } catch (err) {
+          console.warn('[ScreenshotActions] Frontend copy failed (focus lost?), trying backend:', err);
         }
-
-        if (!success) {
-          // Fallback to backend
-          const buffer = await blob.arrayBuffer();
-          const bytes = new Uint8Array(buffer);
-          await ipc.copyImageToClipboard(bytes);
-        }
-      },
-      () => onClose(),
-      (error) => {
-        console.error('Failed to copy:', error);
-        onFeedback('Failed to copy');
       }
-    );
+
+      // 2. Fallback to Backend Clipboard (Reliable even without focus)
+      if (!success) {
+        const buffer = await blob.arrayBuffer();
+        const bytes = new Uint8Array(buffer);
+        await ipc.copyImageToClipboard(bytes);
+        console.log('[ScreenshotActions] Backend copy success');
+      }
+
+      // 3. Conditional Close based on settings
+      const autoClose = useAppStore.getState().autoCloseAfterCopy;
+      if (autoClose) {
+        onClose();
+      }
+      onFeedback('Copied to clipboard');
+
+    } catch (error) {
+      console.error('Failed to copy capture:', error);
+      onFeedback('Failed to copy');
+    }
   };
 
   const handleSave = async () => {
@@ -108,7 +116,13 @@ export function useScreenshotActions({
       },
       'Image saved successfully',
       'Failed to save image',
-      () => onClose()
+      () => {
+        // Only close if auto-close is enabled
+        const autoClose = useAppStore.getState().autoCloseAfterSave;
+        if (autoClose) {
+            onClose();
+        }
+      }
     );
 
     onFeedback(result.message);

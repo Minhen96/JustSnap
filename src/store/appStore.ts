@@ -31,6 +31,12 @@ export const useAppStore = create<AppState>()(
           savePath: state.savePath,
           autoSave: state.autoSave,
           hotkeys: state.hotkeys,
+          toolbarConfig: state.toolbarConfig,
+          defaultTool: state.defaultTool,
+          colorPalette: state.colorPalette,
+          defaultStrokeWidth: state.defaultStrokeWidth,
+          autoCloseAfterCopy: state.autoCloseAfterCopy,
+          autoCloseAfterSave: state.autoCloseAfterSave,
           // We can persist other things if we want, like annotationStyle
         }),
       }

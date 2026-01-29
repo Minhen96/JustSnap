@@ -43,11 +43,30 @@ pub fn run() {
                         app.exit(0);
                     }
                     "show" => {
-                        if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.show();
-                            let _ = window.set_focus();
-                            let _ = window.unminimize();
-                            let _ = window.set_ignore_cursor_events(false);
+                        // Show or Recreate the welcome window
+                        if let Some(window) = app.get_webview_window("welcome") {
+                            let is_visible = window.is_visible().unwrap_or(false);
+                            if is_visible {
+                                let _ = window.hide();
+                            } else {
+                                let _ = window.show();
+                                let _ = window.set_focus();
+                                let _ = window.unminimize();
+                            }
+                        } else {
+                            // Window not found (likely closed/destroyed), so recreate it
+                            use tauri::{WebviewUrl, WebviewWindowBuilder};
+                            let _ = WebviewWindowBuilder::new(
+                                app,
+                                "welcome",
+                                WebviewUrl::App("index.html".into()),
+                            )
+                            .title("JustSnap")
+                            .inner_size(800.0, 600.0)
+                            .resizable(true)
+                            .decorations(true)
+                            .visible(true)
+                            .build();
                         }
                     }
                     _ => {}
@@ -60,7 +79,9 @@ pub fn run() {
                     } = event
                     {
                         let app = tray.app_handle();
-                        if let Some(window) = app.get_webview_window("main") {
+                        // Toggle the welcome window on left-click
+                        // Show or Recreate the welcome window
+                        if let Some(window) = app.get_webview_window("welcome") {
                             let is_visible = window.is_visible().unwrap_or(false);
                             if is_visible {
                                 let _ = window.hide();
@@ -68,8 +89,21 @@ pub fn run() {
                                 let _ = window.show();
                                 let _ = window.set_focus();
                                 let _ = window.unminimize();
-                                let _ = window.set_ignore_cursor_events(false);
                             }
+                        } else {
+                            // Window not found (likely closed/destroyed), so recreate it
+                            use tauri::{WebviewUrl, WebviewWindowBuilder};
+                            let _ = WebviewWindowBuilder::new(
+                                app,
+                                "welcome",
+                                WebviewUrl::App("index.html".into()),
+                            )
+                            .title("JustSnap")
+                            .inner_size(800.0, 600.0)
+                            .resizable(false)
+                            .decorations(true)
+                            .visible(true)
+                            .build();
                         }
                     }
                 })

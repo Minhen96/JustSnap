@@ -17,6 +17,16 @@ export function ScreenshotEditor() {
   const clearScreenshot = useAppStore((state) => state.clearScreenshot);
   const [feedback, setFeedback] = useState<string | null>(null);
 
+  // Auto-dismiss feedback after 2 seconds
+  useEffect(() => {
+    if (feedback) {
+      const timer = setTimeout(() => {
+        setFeedback(null);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [feedback]);
+
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
 
   // Get state values
@@ -80,6 +90,7 @@ export function ScreenshotEditor() {
     onClose: handleClose,
     onCopy: handleCopy,
     onSave: handleSave,
+    onStick: handleStick,
   });
 
 

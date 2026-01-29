@@ -17,8 +17,9 @@ window.onunhandledrejection = function(event) {
 const StickyWindow = lazy(() => import('./components/window/StickyWindow.tsx').then(m => ({ default: m.StickyWindow })));
 const AIPanelWindow = lazy(() => import('./components/window/AIPanelWindow.tsx').then(m => ({ default: m.AIPanelWindow })));
 const TranslationWindow = lazy(() => import('./components/window/TranslationWindow.tsx').then(m => ({ default: m.TranslationWindow })));
+const WelcomeScreen = lazy(() => import('./components/welcome/WelcomeScreen.tsx').then(m => ({ default: m.WelcomeScreen })));
 
-type WindowType = 'app' | 'sticky' | 'ai_panel' | 'translation_panel';
+type WindowType = 'app' | 'sticky' | 'ai_panel' | 'translation_panel' | 'welcome';
 
 function Root() {
   const [windowType, setWindowType] = useState<WindowType>('app');
@@ -56,6 +57,8 @@ function Root() {
             setWindowType('ai_panel');
           } else if (label.startsWith('translation')) {
             setWindowType('translation_panel');
+          } else if (label === 'welcome') {
+            setWindowType('welcome');
           } else {
             // Default to main app (label is 'main')
             setWindowType('app');
@@ -108,6 +111,14 @@ function Root() {
     return (
       <Suspense fallback={null}>
         <StickyWindow />
+      </Suspense>
+    );
+  }
+
+  if (windowType === 'welcome') {
+    return (
+      <Suspense fallback={null}>
+        <WelcomeScreen />
       </Suspense>
     );
   }

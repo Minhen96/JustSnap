@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { X, Copy, Save } from 'lucide-react';
 import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
 import { invoke } from '@tauri-apps/api/core';
@@ -11,19 +11,57 @@ interface Dimensions {
   height: number;
 }
 
+// Canvas-based image renderer for pixel-perfect display across DPI changes
+function CanvasImage({ imagePath, dimensions }: { imagePath: string, dimensions: Dimensions }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  
+  useEffect(() => {
+    if (!canvasRef.current || !imagePath) return;
+    
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    const img = new Image();
+    img.onload = () => {
+      // Set canvas to image's natural size (physical pixels)
+      canvas.width = img.width;
+      canvas.height = img.height;
+      
+      // Draw image at 1:1 pixel ratio
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(img, 0, 0);
+    };
+    img.src = imagePath;
+  }, [imagePath]);
+  
+  return (
+    <canvas 
+      ref={canvasRef}
+      className="absolute top-0 left-0 select-none pointer-events-none"
+      style={{
+        // Scale canvas to fit window using CSS (this doesn't affect pixel data)
+        width: `${dimensions.width}px`,
+        height: `${dimensions.height}px`,
+        imageRendering: 'pixelated',
+      }}
+    />
+  );
+}
+
+
+
 export function StickyWindow() {
   const [imagePath, setImagePath] = useState<string | null>(null);
   const [aspectRatio, setAspectRatio] = useState<number>(1);
   const [dimensions, setDimensions] = useState<Dimensions>({ width: 0, height: 0 });
   const [feedback, setFeedback] = useState<string | null>(null);
-  const [imageNaturalSize, setImageNaturalSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
   const [initialDimensions, setInitialDimensions] = useState<Dimensions | null>(null);
-  const [scaleFactor, setScaleFactor] = useState<number>(1);
+
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
 
   useEffect(() => {
     // 1. Get the injected image data URL
-    // No file system access needed
     const src = (window as any).__STICKY_IMAGE_SRC__;
     console.log("Sticky Source Found:", !!src);
     
@@ -35,23 +73,15 @@ export function StickyWindow() {
            const w = window.innerWidth;
            const h = window.innerHeight;
            
-           // Store the initial logical dimensions (Scale 1.0 for annotations)
-           // If not set yet, set it now.
            setInitialDimensions(prev => prev || { width: w, height: h });
 
-           const dpr = window.devicePixelRatio || 1;
-           const physicalWindowWidth = w * dpr;
-           const physicalScale = physicalWindowWidth / img.width;
-
            if (import.meta.env.DEV) {
-             console.log("Phys-to-Phys Scale:", physicalScale);
              console.log("Initial Dimensions:", w, h);
            }
 
-           setImageNaturalSize({ width: img.width, height: img.height });
+
            setAspectRatio(img.width / img.height);
            setDimensions({ width: w, height: h });
-           setScaleFactor(physicalScale);
        };
        img.onerror = (e) => {
            console.error("Sticky Image Failed:", e);
@@ -71,27 +101,20 @@ export function StickyWindow() {
     } catch (e) {
       console.error("Failed to load sticky annotations:", e);
     }
+  }, []);
 
-    // 2. Setup Resize Listener (Same logic as ScreenshotEditor)
+  // Setup Resize Listener (for manual resizing)
+  useEffect(() => {
     let resizeTimeout: ReturnType<typeof setTimeout>;
     const handleResize = async () => {
         const width = window.innerWidth;
         const height = window.innerHeight;
 
-        // Immediate fill
         setDimensions({ width, height });
-
-        // Recalculate scale factor for rendering quality adjustment
-        if (imageNaturalSize.width > 0) {
-            const dpr = window.devicePixelRatio || 1;
-            const scaleX = (width * dpr) / imageNaturalSize.width;
-            const scaleY = (height * dpr) / imageNaturalSize.height;
-            setScaleFactor(Math.min(scaleX, scaleY));
-        }
 
         const currentRatio = width / height;
 
-        // Debounced Snap
+        // Debounced aspect ratio snap
         if (aspectRatio && Math.abs(currentRatio - aspectRatio) > 0.02) {
              clearTimeout(resizeTimeout);
              resizeTimeout = setTimeout(async () => {
@@ -269,33 +292,16 @@ export function StickyWindow() {
   return (
     <div 
         className="relative w-screen h-screen overflow-hidden bg-transparent group"
+        style={{
+          border: '1px solid rgba(255, 255, 255, 0.5)',
+          borderRadius: '6px',
+          boxShadow: '0 10px 40px rgba(0, 0, 0, 0.4)',
+        }}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
     >
-        {/* Main Image Layer */}
-        <img
-            src={imagePath}
-            alt="Sticky"
-            className="absolute top-0 left-0 w-full h-full object-contain select-none pointer-events-none"
-            style={{
-              // Adaptive rendering based on scale:
-              // - At 1:1 or smaller (or slight upscale): Use pixelated/crisp-edges (sharp)
-              // - When scaled up significantly (> 10%): Use high-quality smoothing
-              imageRendering: scaleFactor < 1.1 ? 'pixelated' : 'high-quality',
-              WebkitFontSmoothing: 'antialiased',
-              // Dynamic sharpening - more at larger scales
-              filter: scaleFactor > 1.2
-                ? 'contrast(1.02) saturate(1.08) brightness(1.01)'  // Scaled up: more sharpening
-                : 'contrast(1.01) saturate(1.05)',                   // Normal: subtle
-              // Prevent subpixel rendering issues
-              transform: 'translateZ(0)',
-              backfaceVisibility: 'hidden',
-              // Force GPU acceleration for crisp rendering
-              willChange: 'transform',
-            } as React.CSSProperties}
-            // Prevent browser image interpolation quality loss
-            draggable={false}
-        />
+        {/* Main Image Layer - Canvas for pixel-perfect rendering */}
+        <CanvasImage imagePath={imagePath} dimensions={dimensions} />
 
         {/* Vector Annotation Layer - Overlaid on top */}
         {annotations.length > 0 && dimensions.width > 0 && (

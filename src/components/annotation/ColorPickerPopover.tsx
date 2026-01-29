@@ -11,9 +11,10 @@ interface ColorPickerPopoverProps {
   isOpen: boolean;
   onClose: () => void;
   buttonRef: React.RefObject<HTMLButtonElement | null>;
+  presetColors?: string[];
 }
 
-const PRESET_COLORS = [
+const DEFAULT_PRESET_COLORS = [
   '#FF0000', // Red
   '#00FF00', // Green  
   '#0000FF', // Blue
@@ -26,11 +27,18 @@ export function ColorPickerPopover({
   isOpen,
   onClose,
   buttonRef,
+  presetColors = DEFAULT_PRESET_COLORS,
 }: ColorPickerPopoverProps) {
   const [customColor, setCustomColor] = useState(currentColor);
   const [recentColors, setRecentColors] = useState<string[]>([]);
+  const [activePresetColors, setActivePresetColors] = useState<string[]>(presetColors);
   const popoverRef = useRef<HTMLDivElement>(null);
   const colorInputRef = useRef<HTMLInputElement>(null);
+
+  // Update internal state when props change
+  useEffect(() => {
+    setActivePresetColors(presetColors);
+  }, [presetColors]);
 
   // Load recent colors from localStorage
   useEffect(() => {
@@ -140,7 +148,7 @@ export function ColorPickerPopover({
       >
         {/* Main Row: 4 Preset Colors + Color Picker Button */}
         <div className="flex items-center gap-1 mb-2">
-          {PRESET_COLORS.map((color) => (
+          {activePresetColors.map((color: string) => (
             <button
               key={color}
               onClick={() => handleColorSelect(color)}

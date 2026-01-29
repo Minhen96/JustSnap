@@ -1,9 +1,7 @@
 // JustSnap - Global Hotkey Management
 // Handles registering and listening for global keyboard shortcuts
 
-use base64::prelude::*;
 // use image::EncodableLayout; // Use simple bytes for now
-use std::io::Cursor;
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
