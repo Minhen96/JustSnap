@@ -66,12 +66,13 @@ pub async fn capture_region(region: CaptureRegion) -> Result<Vec<u8>, String> {
         .or_else(|| monitors.iter().find(|m| m.is_primary()))
         .ok_or_else(|| "No suitable monitor found".to_string())?;
 
-    // Convert region coordinates to monitor-local space
+    // Convert region coordinates to monitor-local space and scale by DPI factor
+    let scale_factor = monitor.scale_factor() as f64;
     let local_region = CaptureRegion {
-        x: region.x - monitor.x(),
-        y: region.y - monitor.y(),
-        width: region.width,
-        height: region.height,
+        x: ((region.x - monitor.x()) as f64 * scale_factor) as i32,
+        y: ((region.y - monitor.y()) as f64 * scale_factor) as i32,
+        width: (region.width as f64 * scale_factor) as i32,
+        height: (region.height as f64 * scale_factor) as i32,
     };
 
     if cfg!(debug_assertions) {

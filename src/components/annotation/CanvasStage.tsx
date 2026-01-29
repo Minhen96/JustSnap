@@ -411,8 +411,10 @@ export function CanvasStage({
   }, []); // Empty deps - function doesn't depend on any props or state
 
   // Get device pixel ratio for high-DPI displays
-  // Force at least 2x supersampling to ensure crisp text and image rendering
-  const pixelRatio = Math.max(window.devicePixelRatio || 1, 2);
+  // Calculate pixel ratio based on the actual source image dimensions vs logical dimensions
+  // This ensures 1:1 pixel mapping regardless of what window.devicePixelRatio reports
+  // (Fixes blur on secondary monitors where DPR might be reported incorrectly)
+  const pixelRatio = image ? (image.width / width) : (window.devicePixelRatio || 1);
 
   // Configure canvas context for maximum quality
   useEffect(() => {
@@ -445,8 +447,8 @@ export function CanvasStage({
         onMouseUp={handleMouseUp}
       >
         <Layer
-          // Force high quality rendering
-          imageSmoothingEnabled={true}
+          // Force pixel-perfect rendering (match StickyWindow)
+          imageSmoothingEnabled={false}
         >
           {/* Background screenshot image */}
           {image && (
@@ -454,8 +456,8 @@ export function CanvasStage({
               image={image}
               width={width}
               height={height}
-              // Maximum quality image rendering
-              imageSmoothingEnabled={true}
+              // Disable smoothing for sharp pixel-perfect display
+              imageSmoothingEnabled={false}
               // Prevent blurriness from fractional positioning
               x={Math.round(0)}
               y={Math.round(0)}
