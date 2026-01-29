@@ -1,204 +1,79 @@
 # JustSnap
 
-**JustSnap** is an AI-powered desktop snipping tool built with Tauri, React, and Rust. It combines traditional screen capture with modern AI capabilities like OCR, translation, and UI code generation.
+**JustSnap** is an AI-powered desktop snipping tool built with Tauri, React, and Rust. It combines traditional screen capture with modern AI capabilities and a seamless, high-performance experience.
 
-## Features
+## ✨ Features
 
-### Core Screenshot Capabilities
-- **Global Hotkey**: Press `Ctrl+Shift+S` anywhere to start snipping.
-- **Smart Region Selection**: Drag to select any area of your screen with live dimension display.
-- **Instant Preview**: Immediately view your captured screenshot in the editor window.
-- **System Tray Support**: Runs quietly in the background; access via the tray icon.
-  - **Show**: Click to bring the welcome screen back.
-  - **Quit**: Click to exit the application.
-- **High Performance**: Built on Rust (Tauri) for minimal resource usage.
-- **Modern UI**: Clean, transparent overlay interface with smooth transitions.
-- **High-DPI Support**: Automatic device pixel ratio scaling for crisp captures.
+### 📸 Core Capture
+- **Global Hotkey**: `Ctrl+Shift+S` to snap instantly.
+- **Region Selection**: Drag to select, with live dimensions.
+- **High-DPI Support**: Crystal clear captures on any monitor.
+- **Sticky Windows**: "Pin" captures to your screen as always-on-top references.
+- **Clipboard Integration**: Copy as image, or save directly to disk.
 
-### Annotation Tools
-- **Pen Tool**: Free-hand drawing on screenshots
-- **Highlighter**: Highlight important areas with transparency
-- **Shapes**: Add rectangles, circles, and other shapes
-- **Blur Tool**: Privacy-focused blurring for sensitive information
-- **Color Picker**: Customizable colors for all annotation tools
+### 🎨 Annotation & Editing
+- **Professional Tools**: Pen, Highlighter, Arrow, Rectangle, Circle, and Text.
+- **Blur Tool**: Securely redact sensitive info.
+- **Customizable**: Adjustable stroke widths, colors, and opacity.
+- **History**: Full Undo/Redo support.
 
-### AI-Powered Features
-- **OCR (Optical Character Recognition)**: Extract text from screenshots with confidence scores powered by Tesseract.js
-- **Translation**: Translate extracted or selected text into multiple languages
-- **UI Code Generation**: Convert UI screenshots into code for React, Vue, Flutter, HTML/Tailwind, and Next.js
-- **AI Chat Panel**: Ask questions about your screenshots and get AI-powered insights
+### 🤖 AI Powers (Gemini Integration)
+- **Ask React**: Ask questions about your screenshot ("What is this error?", "How do I center this?").
+- **Code Generation**: Convert UI screenshots into React/Tailwind, Vue, Flutter, etc.
+- **OCR & Translation**: Extract text and translate instantly.
 
-## Tech Stack
+### ⚙️ Customization
+- **Toolbar Config**: Enable/Disable specific tools.
+- **Behavior Settings**: Auto-close after copy/save, customizable hotkeys.
+- **Theme**: Dark/Light mode support.
 
-- **Backend**: Rust (Tauri)
+## 🛠️ Tech Stack
+
+- **Core**: [Rust](https://www.rust-lang.org/) + [Tauri v2](https://tauri.app/)
 - **Frontend**: React 19 + TypeScript + Vite
-- **Styling**: TailwindCSS + Radix UI
-- **State Management**: Zustand
-- **Canvas Rendering**: Konva + React-Konva
-- **Code Editor**: Monaco Editor
-- **AI Integration**: Google Generative AI (Gemini)
-- **OCR Engine**: Tesseract.js
+- **UI**: TailwindCSS + Radix UI + Lucide Icons
+- **State**: Zustand (with Persist)
+- **AI**: Google Gemini Flash 1.5
 
-## Getting Started
+## 🚀 Getting Started
 
 ### Prerequisites
+- Node.js (v18+)
+- Rust (latest stable)
+- [Tauri Prerequisites](https://tauri.app/v1/guides/getting-started/prerequisites) (Build Tools for C++ on Windows)
 
-- **Node.js** (v18+)
-- **Rust** (latest stable)
-- **System Dependencies**: Follow the [Tauri Prerequisites Guide](https://tauri.app/v1/guides/getting-started/prerequisites) for your OS (Visual Studio Build Tools for Windows, etc.).
-
-### Installation
-
-1. Clone the repository:
+### Development
+1. **Clone & Install**
    ```bash
    git clone https://github.com/yourusername/justsnap.git
    cd justsnap
-   ```
-
-2. Install dependencies:
-   ```bash
    npm install
    ```
 
-   This will install:
-   - Frontend dependencies (React, TypeScript, Vite, TailwindCSS, etc.)
-   - Tauri CLI (automatically included in `devDependencies`)
-
-3. Set up environment variables:
-   ```bash
-   # Copy the example environment file
-   cp .env.example .env
-   ```
-
-   Then edit `.env` and add your OpenAI API key:
-   ```
-   VITE_OPENAI_API_KEY=your_openai_api_key_here
-   ```
-
-4. Run in development mode:
+2. **Run Dev Environment**
    ```bash
    npm run tauri dev
    ```
 
-### Developer Commands
+### Building & Releasing
 
+#### Local Build
+To create an installer (`.exe`) on your machine:
 ```bash
-# Install dependencies
-npm install
-
-# Run FULL development environment (Frontend + Backend)
-# there is only one port using in this project, backend launches the native application window that loads that URL.
-# > Starts web server on localhost:5177 (or configured port)
-# > Compiles Rust backend and opens native application window
-npm run tauri dev
-
-# Run Frontend ONLY (for quick UI development)
-# > Starts web server on localhost:5177
-# > Opens in browser
-# > NOTE: Native Tauri features (screen capture, etc.) will NOT work
-npm run dev
-
-# Build for production
 npm run tauri build
-
-# Lint code
-npm run lint
-
 ```
+The installer will be in `src-tauri/target/release/bundle/nsis/`.
 
-## Usage
+#### Automatic GitHub Release
+This repo is configured with **GitHub Actions** to build automatically when you tag a release.
 
-### Basic Screenshot Capture
-1. **Launch**: The app starts with a welcome screen. It will also run in the background via the system tray.
-2. **Capture**: Press `Ctrl+Shift+S` anywhere to open the snipping overlay.
-3. **Select**: Click and drag to select a region. You'll see:
-   - Live dimension display (width x height)
-   - Dimmed area outside your selection
-   - Blue dashed border around the selected region
-4. **Preview**: Release the mouse to capture. The screenshot opens in the editor window.
+1. Commit your changes.
+2. Create and push a tag (e.g., `v1.0.0`):
+   ```bash
+   git tag v1.0.0
+   git push origin v1.0.0
+   ```
+3. GitHub Actions will build the app and upload the installer to the **Releases** page of your repository.
 
-### Annotation Tools
-Once you've captured a screenshot, use the annotation toolbar to enhance your image:
-- **Pen**: Draw free-hand annotations
-- **Highlighter**: Highlight important sections with transparency
-- **Shapes**: Add rectangles, circles, and other shapes
-- **Blur**: Blur sensitive information for privacy
-- **Color Picker**: Choose custom colors for all tools
-
-### AI Features
-After capturing a screenshot, access powerful AI features:
-- **OCR**: Click the OCR button to extract text from your screenshot
-  - View confidence scores for accuracy
-  - Copy extracted text to clipboard
-- **Translation**: Translate extracted text into multiple languages
-- **Code Generation**: Convert UI screenshots into code
-  - Select your target framework (React, Vue, Flutter, etc.)
-  - View generated code in Monaco Editor
-  - Copy or export the code
-- **AI Chat**: Ask questions about your screenshot and get AI-powered insights
-
-### System Tray
-- **Show**: Brings the welcome screen back if closed
-- **Quit**: Exits the application completely
-
-## Development Status
-
-### Completed Features ✅
-
-#### Phase 1: Core Screenshot Functionality
-- [x] **Global Hotkey System**: `Ctrl+Shift+S` registered on app startup
-- [x] **Fullscreen Overlay**: Transparent, always-on-top overlay window
-- [x] **Region Selection**:
-  - Drag-to-select with live dimension tooltip
-  - SVG-based dimming effect with "hole" for selected region
-  - Blue dashed border for visual feedback
-  - Minimum size validation (10x10 pixels)
-- [x] **Screen Capture**:
-  - High-DPI support with automatic pixel ratio scaling
-  - Rust-based capture using `xcap` crate
-  - PNG format output
-- [x] **Screenshot Preview**: Dedicated window for viewing captures
-- [x] **System Tray Integration**:
-  - Background mode
-  - Show/Quit menu options
-  - Proper window state management
-- [x] **Welcome Screen**:
-  - Feature showcase
-  - Hotkey status indicator
-  - System tray controls
-
-#### Phase 2: Annotation Tools
-- [x] **Pen Tool**: Free-hand drawing with customizable colors and stroke width
-- [x] **Highlighter Tool**: Semi-transparent highlighting
-- [x] **Shape Tool**: Rectangles, circles, and other geometric shapes
-- [x] **Blur Tool**: Privacy-focused blurring with adjustable intensity
-- [x] **Color Picker**: Radix UI-based color selection for all tools
-- [x] **Canvas Integration**: Konva-based annotation layer
-
-#### Phase 3: AI Features
-- [x] **OCR Integration**: Tesseract.js-powered text extraction
-  - Confidence scores for accuracy feedback
-  - Copy-to-clipboard functionality
-  - Progress indicators
-- [x] **Translation Panel**: Multi-language translation support
-  - Dedicated translation window
-  - Integration with extracted text
-- [x] **UI Code Generation**: AI-powered code generation
-  - Support for React, Vue, Flutter, HTML/Tailwind, Next.js
-  - Monaco Editor integration for code preview
-  - Framework selection interface
-- [x] **AI Chat Panel**: Interactive AI assistance for screenshots
-  - Powered by Google Gemini
-  - Context-aware screenshot analysis
-
-### In Progress 🚧
-- [ ] **Multi monitor support**
-- [ ] **Enhanced Code Generation**: Improving code quality and accuracy
-- [ ] **Additional Export Formats**: Support for more image formats
-- [ ] **Custom Hotkeys**: User-configurable keyboard shortcuts
-- [ ] **Long Screenshot**: Capture long screenshots
-- [ ] **Video Recording**: Capture screen recordings with annotations
-
-## License
-
-MIT
+**Note on Secrets**: 
+The workflow uses `GITHUB_TOKEN` which is provided automatically by GitHub. You do **not** need to set any manual secrets for the basic release workflow to work.

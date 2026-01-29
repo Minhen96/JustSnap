@@ -149,15 +149,6 @@ export function AnnotationToolbar({
   const ocrResult = useAppStore((state) => state.ocrResult);
   const ocrError = useAppStore((state) => state.ocrError);
 
-  // Helper to check if an item is enabled
-  const isItemEnabled = useCallback((itemId: ToolbarItemId): boolean => {
-    for (const group of toolbarConfig.groups) {
-      const item = group.items.find(i => i.id === itemId);
-      if (item) return item.enabled;
-    }
-    return true;
-  }, [toolbarConfig]);
-
   // Get ordered items for a group
   const getGroupItems = useCallback((groupId: string) => {
     const group = toolbarConfig.groups.find(g => g.id === groupId);

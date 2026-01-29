@@ -2,7 +2,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "JustSnap",
   "version": "0.1.0",
-  "identifier": "com.justsnap.app",
+  "identifier": "com.justsnap.desktop",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5177",
