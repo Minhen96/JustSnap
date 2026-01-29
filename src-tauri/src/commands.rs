@@ -403,6 +403,7 @@ fn get_window_z_order_map() -> std::collections::HashMap<u32, i32> {
 }
 
 // Helper function to check if two rectangles intersect
+#[allow(dead_code)]
 fn rectangles_intersect(
     rect1: (i32, i32, i32, i32), // (x, y, width, height)
     rect2: (i32, i32, i32, i32),
@@ -469,19 +470,19 @@ pub async fn get_window_at_point(x: i32, y: i32) -> Result<Option<WindowInfo>, S
             let z_order_map = get_window_z_order_map();
 
             for window in &all_windows {
-                if window.id() == window_id {
+                if window.id().unwrap_or(0) == window_id {
                     // Skip minimized windows
-                    if window.is_minimized() {
+                    if window.is_minimized().unwrap_or(false) {
                         return Ok(None);
                     }
 
                     // Skip windows with invalid dimensions
-                    if window.width() == 0 || window.height() == 0 {
+                    if window.width().unwrap_or(0) == 0 || window.height().unwrap_or(0) == 0 {
                         return Ok(None);
                     }
 
-                    let title = window.title();
-                    let app_name = window.app_name();
+                    let title = window.title().unwrap_or_default();
+                    let app_name = window.app_name().unwrap_or_default();
 
                     // Filter out system/overlay windows
                     let title_lower = title.to_lowercase();
@@ -500,29 +501,29 @@ pub async fn get_window_at_point(x: i32, y: i32) -> Result<Option<WindowInfo>, S
                     // If any part is covered, reject it entirely
                     let current_z = z_order_map.get(&window_id).copied().unwrap_or(i32::MAX);
                     let current_rect = (
-                        window.x(),
-                        window.y(),
-                        window.width() as i32,
-                        window.height() as i32,
+                        window.x().unwrap_or(0),
+                        window.y().unwrap_or(0),
+                        window.width().unwrap_or(0) as i32,
+                        window.height().unwrap_or(0) as i32,
                     );
 
                     // Check all other windows
                     for other_window in &all_windows {
-                        if other_window.id() == window_id {
+                        if other_window.id().unwrap_or(0) == window_id {
                             continue; // Skip self
                         }
 
                         // Skip minimized/invalid windows
-                        if other_window.is_minimized()
-                            || other_window.width() == 0
-                            || other_window.height() == 0
+                        if other_window.is_minimized().unwrap_or(false)
+                            || other_window.width().unwrap_or(0) == 0
+                            || other_window.height().unwrap_or(0) == 0
                         {
                             continue;
                         }
 
                         // Get other window's Z-order
                         let other_z = z_order_map
-                            .get(&other_window.id())
+                            .get(&other_window.id().unwrap_or(0))
                             .copied()
                             .unwrap_or(i32::MAX);
 
@@ -530,10 +531,10 @@ pub async fn get_window_at_point(x: i32, y: i32) -> Result<Option<WindowInfo>, S
                         if other_z < current_z {
                             // Check if rectangles overlap
                             let other_rect = (
-                                other_window.x(),
-                                other_window.y(),
-                                other_window.width() as i32,
-                                other_window.height() as i32,
+                                other_window.x().unwrap_or(0),
+                                other_window.y().unwrap_or(0),
+                                other_window.width().unwrap_or(0) as i32,
+                                other_window.height().unwrap_or(0) as i32,
                             );
 
                             if rectangles_intersect(current_rect, other_rect) {
@@ -548,10 +549,10 @@ pub async fn get_window_at_point(x: i32, y: i32) -> Result<Option<WindowInfo>, S
                         id: window_id,
                         title: title.to_string(),
                         app_name: app_name.to_string(),
-                        x: window.x(),
-                        y: window.y(),
-                        width: window.width(),
-                        height: window.height(),
+                        x: window.x().unwrap_or(0),
+                        y: window.y().unwrap_or(0),
+                        width: window.width().unwrap_or(0),
+                        height: window.height().unwrap_or(0),
                         z_order: current_z,
                     }));
                 }
@@ -564,6 +565,8 @@ pub async fn get_window_at_point(x: i32, y: i32) -> Result<Option<WindowInfo>, S
 
     #[cfg(not(windows))]
     {
+        let _ = x;
+        let _ = y;
         Ok(None)
     }
 }

@@ -1,7 +1,7 @@
 // JustSnap - Screen Capture Module
 // Handles screen capture functionality using xcap
 
-use image::{ImageBuffer, Rgba, RgbaImage};
+use image::RgbaImage;
 use std::io::Cursor;
 use xcap::Monitor;
 
@@ -25,14 +25,14 @@ pub fn get_all_monitors() -> Result<Vec<MonitorInfo>, String> {
     let mut result = Vec::new();
     for monitor in monitors {
         result.push(MonitorInfo {
-            id: monitor.id(),
-            name: monitor.name().to_string(),
-            x: monitor.x(),
-            y: monitor.y(),
-            width: monitor.width(),
-            height: monitor.height(),
-            scale_factor: monitor.scale_factor() as f64,
-            is_primary: monitor.is_primary(),
+            id: monitor.id().unwrap_or(0),
+            name: monitor.name().unwrap_or_default(),
+            x: monitor.x().unwrap_or(0),
+            y: monitor.y().unwrap_or(0),
+            width: monitor.width().unwrap_or(0),
+            height: monitor.height().unwrap_or(0),
+            scale_factor: monitor.scale_factor().unwrap_or(1.0) as f64,
+            is_primary: monitor.is_primary().unwrap_or(false),
         });
     }
 
@@ -59,42 +59,37 @@ pub async fn capture_region(region: CaptureRegion) -> Result<Vec<u8>, String> {
     let monitor = monitors
         .iter()
         .find(|m| {
-            let m_right = m.x() + m.width() as i32;
-            let m_bottom = m.y() + m.height() as i32;
-            center_x >= m.x() && center_x < m_right && center_y >= m.y() && center_y < m_bottom
+            let x = m.x().unwrap_or(0);
+            let y = m.y().unwrap_or(0);
+            let width = m.width().unwrap_or(0);
+            let height = m.height().unwrap_or(0);
+            let m_right = x + width as i32;
+            let m_bottom = y + height as i32;
+            center_x >= x && center_x < m_right && center_y >= y && center_y < m_bottom
         })
-        .or_else(|| monitors.iter().find(|m| m.is_primary()))
+        .or_else(|| monitors.iter().find(|m| m.is_primary().unwrap_or(false)))
         .ok_or_else(|| "No suitable monitor found".to_string())?;
 
     // Convert region coordinates to monitor-local space and scale by DPI factor
-    let scale_factor = monitor.scale_factor() as f64;
+
+    // The region coordinates (from frontend) and monitor coordinates (from xcap) are likely
+    // both in physical pixels (for xcap 0.8.1), so significant scaling is handled by the frontend/xcap consistency.
+    // However, strictly speaking, we just want the offset.
+    // Note: If xcap 0.8.1 returns physical coordinates, we do NOT multiply by scale_factor.
     let local_region = CaptureRegion {
-        x: ((region.x - monitor.x()) as f64 * scale_factor) as i32,
-        y: ((region.y - monitor.y()) as f64 * scale_factor) as i32,
-        width: (region.width as f64 * scale_factor) as i32,
-        height: (region.height as f64 * scale_factor) as i32,
+        x: (region.x - monitor.x().unwrap_or(0)),
+        y: (region.y - monitor.y().unwrap_or(0)),
+        width: region.width,
+        height: region.height,
     };
 
-    if cfg!(debug_assertions) {
-        eprintln!(
-            "[capture_region] Virtual ({},{}) -> Monitor '{}' local ({},{})",
-            region.x,
-            region.y,
-            monitor.name(),
-            local_region.x,
-            local_region.y
-        );
-    }
-
     // Capture from the detected monitor
-    let image = monitor
+    let full_image = monitor
         .capture_image()
         .map_err(|e| format!("Failed to capture screen: {}", e))?;
 
-    // Convert to RgbaImage
-    let full_image =
-        ImageBuffer::<Rgba<u8>, Vec<u8>>::from_raw(image.width(), image.height(), image.into_raw())
-            .ok_or_else(|| "Failed to create image buffer".to_string())?;
+    // Convert to RgbaImage (xcap 0.8.1 returns RgbaImage directly)
+    // let full_image = ... (removed manual conversion)
 
     // Crop to the specified region (in local coordinates)
     let cropped = crop_image(&full_image, local_region)?;
@@ -115,16 +110,12 @@ pub async fn capture_full_screen_raw() -> Result<RgbaImage, String> {
 
     let monitor = monitors
         .into_iter()
-        .find(|m| m.is_primary())
+        .find(|m| m.is_primary().unwrap_or(false))
         .ok_or_else(|| "No primary monitor found".to_string())?;
 
-    let image = monitor
+    monitor
         .capture_image()
-        .map_err(|e| format!("Failed to capture screen: {}", e))?;
-
-    // Convert to RgbaImage
-    ImageBuffer::<Rgba<u8>, Vec<u8>>::from_raw(image.width(), image.height(), image.into_raw())
-        .ok_or_else(|| "Failed to create image buffer".to_string())
+        .map_err(|e| format!("Failed to capture screen: {}", e))
 }
 
 /// Capture the monitor containing the given point (cursor position)
@@ -139,11 +130,15 @@ pub fn capture_monitor_at_point_raw(
     let monitor = monitors
         .iter()
         .find(|m| {
-            let m_right = m.x() + m.width() as i32;
-            let m_bottom = m.y() + m.height() as i32;
-            x >= m.x() && x < m_right && y >= m.y() && y < m_bottom
+            let mx = m.x().unwrap_or(0);
+            let my = m.y().unwrap_or(0);
+            let width = m.width().unwrap_or(0);
+            let height = m.height().unwrap_or(0);
+            let m_right = mx + width as i32;
+            let m_bottom = my + height as i32;
+            x >= mx && x < m_right && y >= my && y < m_bottom
         })
-        .or_else(|| monitors.iter().find(|m| m.is_primary()))
+        .or_else(|| monitors.iter().find(|m| m.is_primary().unwrap_or(false)))
         .ok_or_else(|| "No suitable monitor found".to_string())?;
 
     if cfg!(debug_assertions) {
@@ -151,29 +146,25 @@ pub fn capture_monitor_at_point_raw(
             "[capture_monitor_at_point] Point ({},{}) -> Monitor '{}' at ({},{}) {}x{}",
             x,
             y,
-            monitor.name(),
-            monitor.x(),
-            monitor.y(),
-            monitor.width(),
-            monitor.height()
+            monitor.name().unwrap_or_default(),
+            monitor.x().unwrap_or(0),
+            monitor.y().unwrap_or(0),
+            monitor.width().unwrap_or(0),
+            monitor.height().unwrap_or(0)
         );
     }
 
-    let image = monitor
+    let rgba_image = monitor
         .capture_image()
         .map_err(|e| format!("Failed to capture monitor: {}", e))?;
 
-    let rgba_image =
-        ImageBuffer::<Rgba<u8>, Vec<u8>>::from_raw(image.width(), image.height(), image.into_raw())
-            .ok_or_else(|| "Failed to create image buffer".to_string())?;
-
     Ok((
         rgba_image,
-        monitor.x(),
-        monitor.y(),
-        monitor.width(),
-        monitor.height(),
-        monitor.scale_factor() as f64,
+        monitor.x().unwrap_or(0),
+        monitor.y().unwrap_or(0),
+        monitor.width().unwrap_or(0),
+        monitor.height().unwrap_or(0),
+        monitor.scale_factor().unwrap_or(1.0) as f64,
     ))
 }
 
@@ -187,13 +178,9 @@ pub async fn capture_monitor(monitor_id: i32) -> Result<Vec<u8>, String> {
         .nth(monitor_id as usize)
         .ok_or_else(|| format!("Monitor {} not found", monitor_id))?;
 
-    let image = monitor
+    let rgba_image = monitor
         .capture_image()
         .map_err(|e| format!("Failed to capture monitor: {}", e))?;
-
-    let rgba_image =
-        ImageBuffer::<Rgba<u8>, Vec<u8>>::from_raw(image.width(), image.height(), image.into_raw())
-            .ok_or_else(|| "Failed to create image buffer".to_string())?;
 
     encode_as_bmp(&rgba_image)
 }
