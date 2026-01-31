@@ -162,7 +162,7 @@ export function useScreenshotActions({
       async () => {
         const path = await ipc.openSaveDialog('screenshot.png');
         if (path) {
-          await ipc.saveImage(bytes, path, 'png');
+          await ipc.saveImage(bytes, path);
         } else {
           throw new Error('Save cancelled');
         }

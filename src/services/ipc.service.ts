@@ -75,15 +75,12 @@ export async function hideOverlay(): Promise<void> {
 
 export async function saveImage(
   imageData: Uint8Array,
-  fileName: string,
-  format: 'png' | 'jpg' | 'webp'
-): Promise<string> {
-  const path = await invoke<string>('save_image', {
+  path: string
+): Promise<void> {
+  await invoke('save_image', {
     imageData: Array.from(imageData),
-    fileName,
-    format,
+    path,
   });
-  return path;
 }
 
 export async function saveText(content: string, fileName: string): Promise<string> {
