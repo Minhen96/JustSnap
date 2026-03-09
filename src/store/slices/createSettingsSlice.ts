@@ -18,6 +18,7 @@ export interface SettingsState {
     defaultStrokeWidth: number;
     autoCloseAfterCopy: boolean;
     autoCloseAfterSave: boolean;
+    startAtLogin: boolean;
 
     // Actions
     setTheme: (theme: 'light' | 'dark' | 'system') => void;
@@ -29,6 +30,7 @@ export interface SettingsState {
     setDefaultStrokeWidth: (width: number) => void;
     setAutoCloseAfterCopy: (enabled: boolean) => void;
     setAutoCloseAfterSave: (enabled: boolean) => void;
+    setStartAtLogin: (enabled: boolean) => void;
 
     // Toolbar customization
     setToolbarItemEnabled: (groupId: ToolbarGroupId, itemId: ToolbarItemId, enabled: boolean) => void;
@@ -49,6 +51,7 @@ export const createSettingsSlice: StateCreator<SettingsState> = (set) => ({
     defaultStrokeWidth: 4,
     autoCloseAfterCopy: true,
     autoCloseAfterSave: true,
+    startAtLogin: false,
 
     setTheme: (theme) => set({ theme }),
     setSavePath: (savePath) => set({ savePath }),
@@ -62,6 +65,7 @@ export const createSettingsSlice: StateCreator<SettingsState> = (set) => ({
     setDefaultStrokeWidth: (width) => set({ defaultStrokeWidth: width }),
     setAutoCloseAfterCopy: (enabled) => set({ autoCloseAfterCopy: enabled }),
     setAutoCloseAfterSave: (enabled) => set({ autoCloseAfterSave: enabled }),
+    setStartAtLogin: (enabled) => set({ startAtLogin: enabled }),
 
     setToolbarItemEnabled: (groupId, itemId, enabled) =>
         set((state) => ({

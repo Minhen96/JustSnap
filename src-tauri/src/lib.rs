@@ -5,6 +5,8 @@ mod commands;
 mod hotkeys;
 mod screen_capture;
 
+use tauri_plugin_autostart::MacosLauncher;
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -12,6 +14,11 @@ pub fn run() {
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         // Allows opening file dialogs for saving images and text.
         .plugin(tauri_plugin_dialog::init())
+        // Allows the app to start automatically on system boot.
+        .plugin(tauri_plugin_autostart::init(
+            MacosLauncher::LaunchAgent,
+            Some(vec!["--silence"]),
+        ))
         // Run the code here before the app window is created.
         .setup(|app| {
             // Debug logging. (Only enabled in debug mode)

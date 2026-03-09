@@ -29,6 +29,7 @@
     "core:window:allow-close",
     "core:window:allow-current-monitor",
     "core:window:allow-available-monitors",
-    "dialog:default"
+    "dialog:default",
+    "autostart:default"
   ]
 }
