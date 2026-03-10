@@ -21,6 +21,14 @@ pub fn run() {
         ))
         // Run the code here before the app window is created.
         .setup(|app| {
+            // Handle background startup
+            let args: Vec<String> = std::env::args().collect();
+            if args.contains(&"--silence".to_string()) {
+                if let Some(window) = app.get_webview_window("welcome") {
+                    let _ = window.hide();
+                }
+            }
+
             // Debug logging. (Only enabled in debug mode)
             if cfg!(debug_assertions) {
                 app.handle().plugin(
